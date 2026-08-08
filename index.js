@@ -32,24 +32,21 @@ export default {
 
 async function handleInlineQuery(inlineQuery, token) {
   const queryId = inlineQuery.id;
-  
-  // ساخت یک کیبورد ساده و تست‌شده برای حالت اینلاین
+  const puzzle = generateSudoku();
+  const keyboard = buildSudokuKeyboard(puzzle);
+
   const results = [
     {
       type: 'article',
-      id: 'sudoku_start_' + Date.now(),
-      title: '🧩 کلیک برای ارسال جدول سودوکو',
-      description: 'برای شروع بازی سودوکو در گروه کلیک کنید',
+      id: 'sudoku_' + Date.now(),
+      title: '🧩 شروع بازی سودوکو',
+      description: 'برای ارسال جدول سودوکو به گروه کلیک کنید',
       input_message_content: {
-        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای شروع بازی روی دکمه زیر کلیک کنید:",
+        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای بازی روی خانه‌های جدول کلیک کنید.\n\n⚠️ *توجه: برای بازی باید عضو کانال‌های زیر باشید:* \n@nwechannell \n@parvapoem",
         parse_mode: 'Markdown'
       },
       reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "🎮 شروع بازی و ساخت جدول", callback_data: "new_game" }
-          ]
-        ]
+        inline_keyboard: keyboard
       }
     }
   ];
@@ -102,26 +99,11 @@ async function handleCallbackQuery(callbackQuery, token) {
 
   await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
     method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ callback_query_id: callbackQuery.id })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ callback_query_id: callbackQuery.id })
   });
 
-  if (data === 'new_game' || data === 'back_to_board') {
-    const puzzle = generateSudoku();
-    const boardKeyboard = buildSudokuKeyboard(puzzle);
-
-    // اگر پیام از طریق اینلاین ارسال شده باشد، با editMessageReplyMarkup بروزرسانی می‌شود
-    await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        message_id: messageId,
-        reply_markup: { inline_keyboard: boardKeyboard }
-      })
-    });
-  }
-  else if (data.startsWith('cell_')) {
+  if (data.startsWith('cell_')) {
     const [, r, c] = data.split('_');
     const numberKeyboard = buildNumberKeyboard(r, c);
 
@@ -132,6 +114,20 @@ async function handleCallbackQuery(callbackQuery, token) {
         chat_id: chatId,
         message_id: messageId,
         reply_markup: { inline_keyboard: numberKeyboard }
+      })
+    });
+  } 
+  else if (data === 'back_to_board' || data === 'new_game') {
+    const puzzle = generateSudoku();
+    const boardKeyboard = buildSudokuKeyboard(puzzle);
+
+    await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: { inline_keyboard: boardKeyboard }
       })
     });
   }
