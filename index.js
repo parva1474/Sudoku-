@@ -24,7 +24,7 @@ export default {
 
       return new Response('OK');
     } catch (e) {
-      console.error(e);
+      console.error("Worker Error:", e);
       return new Response(e.message, { status: 500 });
     }
   }
@@ -38,11 +38,11 @@ async function handleInlineQuery(inlineQuery, token) {
   const results = [
     {
       type: 'article',
-      id: String(Date.now()),
+      id: 'sudoku_match_' + Date.now(),
       title: '🧩 شروع بازی سودوکو',
       description: 'برای ارسال جدول سودوکو در گروه کلیک کنید',
       input_message_content: {
-        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای بازی روی خانه‌های جدول کلیک کنید.",
+        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای بازی روی خانه‌های جدول کلیک کنید.\n\n⚠️ *توجه: برای بازی باید عضو کانال‌های زیر باشید:* \n@nwechannell \n@parvapoem",
         parse_mode: 'Markdown'
       },
       reply_markup: {
@@ -51,7 +51,7 @@ async function handleInlineQuery(inlineQuery, token) {
     }
   ];
 
-  await fetch(`https://api.telegram.org/bot${token}/answerInlineQuery`, {
+  const response = await fetch(`https://api.telegram.org/bot${token}/answerInlineQuery`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -61,6 +61,9 @@ async function handleInlineQuery(inlineQuery, token) {
       is_personal: true
     })
   });
+  
+  const resultText = await response.text();
+  console.log("answerInlineQuery response:", resultText);
 }
 
 async function checkUserMembership(userId, token) {
@@ -104,6 +107,7 @@ async function handleCallbackQuery(callbackQuery, token) {
     body: JSON.stringify({ callback_query_id: callbackQuery.id })
   });
 
+  // ۱. کلیک روی خانه جدول برای انتخاب عدد
   if (data.startsWith('cell_')) {
     const [, r, c] = data.split('_');
     const numberKeyboard = buildNumberKeyboard(r, c);
@@ -118,6 +122,7 @@ async function handleCallbackQuery(callbackQuery, token) {
       })
     });
   } 
+  // ۲. درخواست بازی جدید یا بازگشت به جدول
   else if (data === 'back_to_board' || data === 'new_game') {
     const puzzle = generateSudoku();
     const boardKeyboard = buildSudokuKeyboard(puzzle);
@@ -132,8 +137,10 @@ async function handleCallbackQuery(callbackQuery, token) {
       })
     });
   }
+  // ۳. ثبت عدد انتخاب شده روی جدول
   else if (data.startsWith('set_')) {
     const [, r, c, val] = data.split('_');
+    // ساخت موقت جدول جدید برای نمایش تغییر (در گام‌های بعدی می‌توانید KV را متصل کنید)
     const puzzle = generateSudoku();
     puzzle[r][c] = parseInt(val);
     const boardKeyboard = buildSudokuKeyboard(puzzle);
@@ -148,4 +155,4 @@ async function handleCallbackQuery(callbackQuery, token) {
       })
     });
   }
-        }
+}
