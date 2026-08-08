@@ -38,8 +38,9 @@ async function handleInlineQuery(inlineQuery, token) {
   const results = [
     {
       type: 'article',
-      id: '1',
+      id: 'sudoku_match_1',
       title: '🧩 شروع بازی سودوکو',
+      description: 'کلیک کنید تا جدول سودوکو در گروه ارسال شود',
       input_message_content: {
         message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای بازی روی خانه‌های جدول کلیک کنید تا اعداد را وارد کنید.\n\n⚠️ *توجه: برای بازی باید عضو کانال‌های زیر باشید:* \n@nwechannell \n@parvapoem",
         parse_mode: 'Markdown'
@@ -102,7 +103,6 @@ async function handleCallbackQuery(callbackQuery, token) {
     body: JSON.stringify({ callback_query_id: callbackQuery.id })
   });
 
-  // اگر کاربر روی یک خانه کلیک کرد تا عدد انتخاب کند
   if (data.startsWith('cell_')) {
     const [, r, c] = data.split('_');
     const numberKeyboard = buildNumberKeyboard(r, c);
@@ -117,7 +117,6 @@ async function handleCallbackQuery(callbackQuery, token) {
       })
     });
   } 
-  // اگر کاربر خواست به جدول اصلی برگردد
   else if (data === 'back_to_board' || data === 'new_game') {
     const puzzle = generateSudoku();
     const boardKeyboard = buildSudokuKeyboard(puzzle);
@@ -132,11 +131,8 @@ async function handleCallbackQuery(callbackQuery, token) {
       })
     });
   }
-  // اگر کاربر یک عدد را برای خانه انتخاب کرد
   else if (data.startsWith('set_')) {
     const [, r, c, val] = data.split('_');
-    // اینجا می‌توانید مقدار جدید را در دیتابیس یا وضعیت موقت ذخیره کنید
-    // فعلا برای تست، جدول را رفرش می‌کنیم و به حالت اصلی برمی‌گردانیم
     const puzzle = generateSudoku();
     puzzle[r][c] = parseInt(val);
     const boardKeyboard = buildSudokuKeyboard(puzzle);
@@ -151,4 +147,4 @@ async function handleCallbackQuery(callbackQuery, token) {
       })
     });
   }
-  }
+}
