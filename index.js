@@ -32,21 +32,24 @@ export default {
 
 async function handleInlineQuery(inlineQuery, token) {
   const queryId = inlineQuery.id;
-  const puzzle = generateSudoku();
-  const keyboard = buildSudokuKeyboard(puzzle);
 
+  // پاسخ سریع و سبک برای اینکه علامت چرخش فورا برطرف شود
   const results = [
     {
       type: 'article',
-      id: 'sudoku_' + Date.now(),
+      id: 'sudoku_init_' + Date.now(),
       title: '🧩 شروع بازی سودوکو',
       description: 'برای ارسال جدول سودوکو به گروه کلیک کنید',
       input_message_content: {
-        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای بازی روی خانه‌های جدول کلیک کنید.",
+        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای شروع بازی و ساخت جدول روی دکمه زیر کلیک کنید:",
         parse_mode: 'Markdown'
       },
       reply_markup: {
-        inline_keyboard: keyboard
+        inline_keyboard: [
+          [
+            { text: "🎮 کلیک برای ساخت جدول", callback_data: "new_game" }
+          ]
+        ]
       }
     }
   ];
@@ -103,21 +106,7 @@ async function handleCallbackQuery(callbackQuery, token) {
     body: JSON.stringify({ callback_query_id: callbackQuery.id })
   });
 
-  if (data.startsWith('cell_')) {
-    const [, r, c] = data.split('_');
-    const numberKeyboard = buildNumberKeyboard(r, c);
-
-    await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        message_id: messageId,
-        reply_markup: { inline_keyboard: numberKeyboard }
-      })
-    });
-  } 
-  else if (data === 'back_to_board' || data === 'new_game') {
+  if (data === 'new_game' || data === 'back_to_board') {
     const puzzle = generateSudoku();
     const boardKeyboard = buildSudokuKeyboard(puzzle);
 
@@ -131,14 +120,17 @@ async function handleCallbackQuery(callbackQuery, token) {
       })
     });
   }
-  else if (data === 'help_game') {
-    await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+  else if (data.startsWith('cell_')) {
+    const [, r, c] = data.split('_');
+    const numberKeyboard = buildNumberKeyboard(r, c);
+
+    await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        callback_query_id: callbackQuery.id,
-        text: "راهنما: روی هر خانه از جدول کلیک کنید تا اعداد ظاهر شوند.",
-        show_alert: true
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: { inline_keyboard: numberKeyboard }
       })
     });
   }
