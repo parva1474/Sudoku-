@@ -1,6 +1,5 @@
 // بانک معماهای استاندارد سودوکو
 const sudokuBank = [
-  // معما شماره ۱ (آسان)
   [
     [5, 3, 0, 0, 7, 0, 0, 0, 0],
     [6, 0, 0, 1, 9, 5, 0, 0, 0],
@@ -12,7 +11,6 @@ const sudokuBank = [
     [0, 0, 0, 4, 1, 9, 0, 0, 5],
     [0, 0, 0, 0, 8, 0, 0, 7, 9]
   ],
-  // معما شماره ۲ (آسان/متوسط)
   [
     [0, 2, 0, 6, 0, 8, 0, 0, 0],
     [5, 8, 0, 0, 0, 9, 7, 0, 0],
@@ -23,30 +21,16 @@ const sudokuBank = [
     [0, 0, 0, 0, 2, 0, 0, 0, 0],
     [0, 0, 9, 8, 0, 0, 0, 3, 6],
     [0, 0, 0, 3, 0, 6, 0, 9, 0]
-  ],
-  // معما شماره ۳ (متوسط)
-  [
-    [0, 0, 0, 2, 6, 0, 7, 0, 1],
-    [6, 8, 0, 0, 7, 0, 0, 9, 0],
-    [1, 9, 0, 0, 0, 4, 5, 0, 0],
-    [8, 2, 0, 1, 0, 0, 0, 4, 0],
-    [0, 0, 4, 6, 0, 2, 9, 0, 0],
-    [0, 5, 0, 0, 0, 3, 0, 2, 8],
-    [0, 0, 9, 3, 0, 0, 0, 7, 4],
-    [0, 4, 0, 0, 5, 0, 0, 3, 6],
-    [7, 0, 3, 0, 1, 8, 0, 0, 0]
   ]
 ];
 
-// انتخاب تصادفی یک جدول از بانک معماها
 export function generateSudoku() {
   const randomIndex = Math.floor(Math.random() * sudokuBank.length);
-  // ایجاد یک کپی عمیق (Deep Copy) از جدول انتخابی تا به اصلی لطمه‌ای نخورد
   return sudokuBank[randomIndex].map(row => [...row]);
 }
 
-// ساخت کیبورد شیشه‌ای جدول سودوکو
-export function buildSudokuKeyboard(board) {
+// ساخت کیبورد جدول سودوکو
+export function buildSudokuKeyboard(board, selectedCell = null) {
   const numberEmojis = ['▫️', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'];
   let keyboard = [];
 
@@ -56,6 +40,11 @@ export function buildSudokuKeyboard(board) {
       let val = board[r][c];
       let text = numberEmojis[val];
 
+      // اگر این خانه انتخاب شده باشد، نشانگر بگذاریم
+      if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
+        text = '🔘';
+      }
+
       row.push({
         text: text,
         callback_data: `cell_${r}_${c}`
@@ -64,10 +53,34 @@ export function buildSudokuKeyboard(board) {
     keyboard.push(row);
   }
 
-  // اضافه کردن کنترل‌ها در پایین جدول
   keyboard.push([
     { text: "🔄 بازی جدید", callback_data: "new_game" }
   ]);
 
   return keyboard;
+}
+
+// ساخت کیبورد اعداد برای وارد کردن به خانه انتخاب شده
+export function buildNumberKeyboard(r, c) {
+  return [
+    [
+      { text: "1️⃣", callback_data: `set_${r}_${c}_1` },
+      { text: "2️⃣", callback_data: `set_${r}_${c}_2` },
+      { text: "3️⃣", callback_data: `set_${r}_${c}_3` }
+    ],
+    [
+      { text: "4️⃣", callback_data: `set_${r}_${c}_4` },
+      { text: "5️⃣", callback_data: `set_${r}_${c}_5` },
+      { text: "6️⃣", callback_data: `set_${r}_${c}_6` }
+    ],
+    [
+      { text: "7️⃣", callback_data: `set_${r}_${c}_7` },
+      { text: "8️⃣", callback_data: `set_${r}_${c}_8` },
+      { text: "9️⃣", callback_data: `set_${r}_${c}_9` }
+    ],
+    [
+      { text: "❌ پاک کردن خانه", callback_data: `set_${r}_${c}_0` },
+      { text: "🔙 بازگشت به جدول", callback_data: "back_to_board" }
+    ]
+  ];
 }
