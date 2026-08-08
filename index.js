@@ -13,7 +13,7 @@ export default {
       const token = env.BOT_TOKEN;
 
       if (!token) {
-        return new Response('BOT_TOKEN is not set in environment variables', { status: 500 });
+        return new Response('BOT_TOKEN is not set', { status: 500 });
       }
 
       if (update.inline_query) {
@@ -24,48 +24,45 @@ export default {
 
       return new Response('OK');
     } catch (e) {
-      console.error("Worker Error:", e);
+      console.error(e);
       return new Response(e.message, { status: 500 });
     }
   }
 };
 
 async function handleInlineQuery(inlineQuery, token) {
-  console.log("🔥 INLINE QUERY RECEIVED:", JSON.stringify(inlineQuery));
-
   const queryId = inlineQuery.id;
-  const puzzle = generateSudoku();
-  const keyboard = buildSudokuKeyboard(puzzle);
-
+  
+  // ساخت یک کیبورد ساده و تست‌شده برای حالت اینلاین
   const results = [
     {
       type: 'article',
-      id: 'sudoku_match_' + Date.now(),
-      title: '🧩 شروع بازی سودوکو',
-      description: 'برای ارسال جدول سودوکو در گروه کلیک کنید',
+      id: 'sudoku_start_' + Date.now(),
+      title: '🧩 کلیک برای ارسال جدول سودوکو',
+      description: 'برای شروع بازی سودوکو در گروه کلیک کنید',
       input_message_content: {
-        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای بازی روی خانه‌های جدول کلیک کنید.\n\n⚠️ *توجه: برای بازی باید عضو کانال‌های زیر باشید:* \n@nwechannell \n@parvapoem",
+        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای شروع بازی روی دکمه زیر کلیک کنید:",
         parse_mode: 'Markdown'
       },
       reply_markup: {
-        inline_keyboard: keyboard
+        inline_keyboard: [
+          [
+            { text: "🎮 شروع بازی و ساخت جدول", callback_data: "new_game" }
+          ]
+        ]
       }
     }
   ];
 
-  const response = await fetch(`https://api.telegram.org/bot${token}/answerInlineQuery`, {
+  await fetch(`https://api.telegram.org/bot${token}/answerInlineQuery`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       inline_query_id: queryId,
       results: results,
-      cache_time: 0,
-      is_personal: true
+      cache_time: 0
     })
   });
-  
-  const resultText = await response.text();
-  console.log("answerInlineQuery response:", resultText);
 }
 
 async function checkUserMembership(userId, token) {
@@ -105,11 +102,26 @@ async function handleCallbackQuery(callbackQuery, token) {
 
   await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ callback_query_id: callbackQuery.id })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: callbackQuery.id })
   });
 
-  if (data.startsWith('cell_')) {
+  if (data === 'new_game' || data === 'back_to_board') {
+    const puzzle = generateSudoku();
+    const boardKeyboard = buildSudokuKeyboard(puzzle);
+
+    // اگر پیام از طریق اینلاین ارسال شده باشد، با editMessageReplyMarkup بروزرسانی می‌شود
+    await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: { inline_keyboard: boardKeyboard }
+      })
+    });
+  }
+  else if (data.startsWith('cell_')) {
     const [, r, c] = data.split('_');
     const numberKeyboard = buildNumberKeyboard(r, c);
 
@@ -120,20 +132,6 @@ async function handleCallbackQuery(callbackQuery, token) {
         chat_id: chatId,
         message_id: messageId,
         reply_markup: { inline_keyboard: numberKeyboard }
-      })
-    });
-  } 
-  else if (data === 'back_to_board' || data === 'new_game') {
-    const puzzle = generateSudoku();
-    const boardKeyboard = buildSudokuKeyboard(puzzle);
-
-    await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        message_id: messageId,
-        reply_markup: { inline_keyboard: boardKeyboard }
       })
     });
   }
