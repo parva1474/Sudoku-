@@ -38,11 +38,11 @@ async function handleInlineQuery(inlineQuery, token) {
   const results = [
     {
       type: 'article',
-      id: 'sudoku_match_1',
+      id: String(Date.now()),
       title: '🧩 شروع بازی سودوکو',
-      description: 'کلیک کنید تا جدول سودوکو در گروه ارسال شود',
+      description: 'برای ارسال جدول سودوکو در گروه کلیک کنید',
       input_message_content: {
-        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای بازی روی خانه‌های جدول کلیک کنید تا اعداد را وارد کنید.\n\n⚠️ *توجه: برای بازی باید عضو کانال‌های زیر باشید:* \n@nwechannell \n@parvapoem",
+        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای بازی روی خانه‌های جدول کلیک کنید.",
         parse_mode: 'Markdown'
       },
       reply_markup: {
@@ -57,7 +57,8 @@ async function handleInlineQuery(inlineQuery, token) {
     body: JSON.stringify({
       inline_query_id: queryId,
       results: results,
-      cache_time: 0
+      cache_time: 0,
+      is_personal: true
     })
   });
 }
@@ -147,4 +148,4 @@ async function handleCallbackQuery(callbackQuery, token) {
       })
     });
   }
-}
+        }
