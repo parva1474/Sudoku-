@@ -1,20 +1,48 @@
-const sudokuBank = [
-  [
-    [5, 3, 0, 0, 7, 0, 0, 0, 0],
-    [6, 0, 0, 1, 9, 5, 0, 0, 0],
-    [0, 9, 8, 0, 0, 0, 0, 6, 0],
-    [8, 0, 0, 0, 6, 0, 0, 0, 3],
-    [4, 0, 0, 8, 0, 3, 0, 0, 1],
-    [7, 0, 0, 0, 2, 0, 0, 0, 6],
-    [0, 6, 0, 0, 0, 0, 2, 8, 0],
-    [0, 0, 0, 4, 1, 9, 0, 0, 5],
-    [0, 0, 0, 0, 8, 0, 0, 7, 9]
-  ]
-];
+// تابع تولید خودکار و الگوریتمی جدول سودوکو
+function createBaseSudoku() {
+  const base = [
+    [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    [4, 5, 6, 7, 8, 9, 1, 2, 3],
+    [7, 8, 9, 1, 2, 3, 4, 5, 6],
+    [2, 3, 1, 5, 6, 4, 8, 9, 7],
+    [5, 6, 4, 8, 9, 7, 2, 3, 1],
+    [8, 9, 7, 2, 3, 1, 5, 6, 4],
+    [3, 1, 2, 6, 4, 5, 9, 7, 8],
+    [6, 4, 5, 9, 7, 8, 3, 1, 2],
+    [9, 7, 8, 3, 1, 2, 6, 4, 5]
+  ];
+  
+  // به هم ریختن تصادفی برای ایجاد یک جدول کاملاً جدید و معتبر
+  for (let i = 0; i < 5; i++) {
+    const n1 = Math.floor(Math.random() * 3);
+    const n2 = Math.floor(Math.random() * 3);
+    const block = Math.floor(Math.random() * 3);
+    
+    // جابجایی سطرها درون بلوک‌ها
+    let row1 = block * 3 + n1;
+    let row2 = block * 3 + n2;
+    let temp = base[row1];
+    base[row1] = base[row2];
+    base[row2] = temp;
+  }
+
+  // پنهان کردن تعدادی از خانه‌ها برای تبدیل به معما (صفر کردن)
+  let puzzle = base.map(row => [...row]);
+  let removedCount = 0;
+  while (removedCount < 40) { // حذف حدود 40 خانه برای ایجاد سختی استاندارد
+    let r = Math.floor(Math.random() * 9);
+    let c = Math.floor(Math.random() * 9);
+    if (puzzle[r][c] !== 0) {
+      puzzle[r][c] = 0;
+      removedCount++;
+    }
+  }
+
+  return puzzle;
+}
 
 export function generateSudoku() {
-  const randomIndex = Math.floor(Math.random() * sudokuBank.length);
-  return sudokuBank[randomIndex].map(row => [...row]);
+  return createBaseSudoku();
 }
 
 // تفکیک بلوک‌های ۳ در ۳ با اموجی‌های متنوع برای زیبایی و خوانایی
@@ -26,7 +54,6 @@ export function buildSudokuKeyboard(board, selectedCell = null) {
     for (let c = 0; c < 9; c++) {
       let val = board[r][c];
       
-      // تعیین بلوک ۳ در ۳ برای تغییر ظاهر و رنگ‌بندی خانه‌ها
       let boxBlock = Math.floor(r / 3) * 3 + Math.floor(c / 3);
       let blockEmojis = [
         ['⬛', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'],
@@ -54,7 +81,6 @@ export function buildSudokuKeyboard(board, selectedCell = null) {
     keyboard.push(row);
   }
 
-  // کلیدهای پایینی جذاب و کاربردی
   keyboard.push([
     { text: "🔄 بازی جدید", callback_data: "new_game" },
     { text: "💡 راهنما", callback_data: "help_game" }
