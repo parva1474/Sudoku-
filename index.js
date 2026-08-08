@@ -1,4 +1,4 @@
-import { generateSudoku, buildSudokuKeyboard } from './sudoku.js';
+import { generateSudoku, buildSudokuKeyboard, buildNumberKeyboard } from './sudoku.js';
 
 const REQUIRED_CHANNELS = ['@nwechannell', '@parvapoem'];
 
@@ -16,12 +16,9 @@ export default {
         return new Response('BOT_TOKEN is not set in environment variables', { status: 500 });
       }
 
-      // ۱. مدیریت حالت اینلاین (وقتی کاربر ربات را در گروه منشن می‌کند)
       if (update.inline_query) {
         await handleInlineQuery(update.inline_query, token);
-      } 
-      // ۲. مدیریت کلیک روی دکمه‌ها
-      else if (update.callback_query) {
+      } else if (update.callback_query) {
         await handleCallbackQuery(update.callback_query, token);
       }
 
@@ -44,7 +41,7 @@ async function handleInlineQuery(inlineQuery, token) {
       id: '1',
       title: '🧩 شروع بازی سودوکو',
       input_message_content: {
-        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای بازی روی خانه‌های جدول کلیک کنید.\n\n⚠️ *توجه: برای بازی باید عضو کانال‌های زیر باشید:* \n@nwechannell \n@parvapoem",
+        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای بازی روی خانه‌های جدول کلیک کنید تا اعداد را وارد کنید.\n\n⚠️ *توجه: برای بازی باید عضو کانال‌های زیر باشید:* \n@nwechannell \n@parvapoem",
         parse_mode: 'Markdown'
       },
       reply_markup: {
@@ -82,8 +79,9 @@ async function checkUserMembership(userId, token) {
 async function handleCallbackQuery(callbackQuery, token) {
   const userId = callbackQuery.from.id;
   const data = callbackQuery.data;
+  const chatId = callbackQuery.message.chat.id;
+  const messageId = callbackQuery.message.message_id;
 
-  // بررسی عضویت اجباری
   const isMember = await checkUserMembership(userId, token);
   if (!isMember) {
     await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
@@ -101,9 +99,56 @@ async function handleCallbackQuery(callbackQuery, token) {
   await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      callback_query_id: callbackQuery.id,
-      text: "خانه انتخاب شد!"
-    })
+    body: JSON.stringify({ callback_query_id: callbackQuery.id })
   });
-}
+
+  // اگر کاربر روی یک خانه کلیک کرد تا عدد انتخاب کند
+  if (data.startsWith('cell_')) {
+    const [, r, c] = data.split('_');
+    const numberKeyboard = buildNumberKeyboard(r, c);
+
+    await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: { inline_keyboard: numberKeyboard }
+      })
+    });
+  } 
+  // اگر کاربر خواست به جدول اصلی برگردد
+  else if (data === 'back_to_board' || data === 'new_game') {
+    const puzzle = generateSudoku();
+    const boardKeyboard = buildSudokuKeyboard(puzzle);
+
+    await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: { inline_keyboard: boardKeyboard }
+      })
+    });
+  }
+  // اگر کاربر یک عدد را برای خانه انتخاب کرد
+  else if (data.startsWith('set_')) {
+    const [, r, c, val] = data.split('_');
+    // اینجا می‌توانید مقدار جدید را در دیتابیس یا وضعیت موقت ذخیره کنید
+    // فعلا برای تست، جدول را رفرش می‌کنیم و به حالت اصلی برمی‌گردانیم
+    const puzzle = generateSudoku();
+    puzzle[r][c] = parseInt(val);
+    const boardKeyboard = buildSudokuKeyboard(puzzle);
+
+    await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: { inline_keyboard: boardKeyboard }
+      })
+    });
+  }
+  }
