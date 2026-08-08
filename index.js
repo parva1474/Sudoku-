@@ -25,7 +25,7 @@ export default {
 };
 
 // ----------------------------------------------------
-// الگوریتم استاندارد و واقعی تولید سودوکو
+// 1. Sudoku Generator & Solver Engine
 // ----------------------------------------------------
 function isValid(board, row, col, num) {
   for (let i = 0; i < 9; i++) {
@@ -63,34 +63,74 @@ function solveSudoku(board) {
   return true;
 }
 
-function generateSudoku() {
-  let board = Array(9).fill(0).map(() => Array(9).fill(0));
-  solveSudoku(board);
+function generateNewGame() {
+  // تولید جدول کامل حل شده به عنوان Solution اصلی
+  let solutionBoard = Array(9).fill(0).map(() => Array(9).fill(0));
+  solveSudoku(solutionBoard);
 
-  // حذف ۳۵ خانه برای ایجاد معما
+  // کپی برای ساخت معما با حذف ۳۵ خانه
+  let puzzleBoard = solutionBoard.map(row => [...row]);
   let removedCount = 0;
   while (removedCount < 35) {
     let r = Math.floor(Math.random() * 9);
     let c = Math.floor(Math.random() * 9);
-    if (board[r][c] !== 0) {
-      board[r][c] = 0;
+    if (puzzleBoard[r][c] !== 0) {
+      puzzleBoard[r][c] = 0;
       removedCount++;
     }
   }
-  return board;
+
+  // ساخت ساختار پیشرفته سلول‌ها بر اساس معماری مشخص‌شده
+  let board = [];
+  for (let r = 0; r < 9; r++) {
+    let row = [];
+    for (let c = 0; c < 9; c++) {
+      let val = puzzleBoard[r][c];
+      row.push({
+        value: val !== 0 ? val : null,
+        solutionValue: solutionBoard[r][c],
+        given: val !== 0,
+        notes: [], // یادداشت‌های مدادی
+        isError: false,
+        isHint: false
+      });
+    }
+    board.push(row);
+  }
+
+  return {
+    board: board,
+    status: 'PLAYING',
+    mistakes: 0,
+    maxMistakes: 3,
+    pencilMode: false
+  };
 }
 
-// ساخت کیبورد با تفکیک تمیز ۳ در ۳ بدون خط‌چین اضافی
-function buildSudokuKeyboard(board, selectedCell = null) {
+// ----------------------------------------------------
+// 2. UI & Keyboard Renderers
+// ----------------------------------------------------
+function buildSudokuKeyboard(gameState, selectedCell = null) {
   let keyboard = [];
   const emojis = ['⬛', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'];
+  const board = gameState.board;
 
   for (let r = 0; r < 9; r++) {
     let row = [];
     for (let c = 0; c < 9; c++) {
-      let val = board[r][c];
-      let text = emojis[val];
+      let cell = board[r][c];
+      let text = '';
 
+      if (cell.value !== null) {
+        text = emojis[cell.value];
+        if (cell.isError) text = '❌'; // نمایش خطا در صورت اشتباه بودن
+      } else if (cell.notes && cell.notes.length > 0) {
+        text = '✍️'; // نشانگر وجود یادداشت مدادی
+      } else {
+        text = emojis[0];
+      }
+
+      // هایلایت کردن خانه انتخاب شده
       if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
         text = '📍 ' + text;
       }
@@ -102,7 +142,7 @@ function buildSudokuKeyboard(board, selectedCell = null) {
     }
     keyboard.push(row);
 
-    // ایجاد فاصله استاندارد بین بلوک‌های ۳ در ۳ بدون خط و خط‌چین
+    // خط فاصله استاندارد بین بلوک‌های ۳ در ۳
     if (r === 2 || r === 5) {
       keyboard.push([
         { text: "🔹 🔹 🔹 🔹 🔹 🔹 🔹 🔹 🔹", callback_data: "noop" }
@@ -110,49 +150,64 @@ function buildSudokuKeyboard(board, selectedCell = null) {
     }
   }
 
-  // کیبورد اعداد در پایین صفحه
-  if (selectedCell) {
+  // اگر خانه‌ای انتخاب شده باشد و بازی در جریان باشد، کنترل‌های پایین صفحه نمایش داده می‌شوند
+  if (selectedCell && gameState.status === 'PLAYING') {
     const { r, c } = selectedCell;
+    const cell = board[r][c];
+
+    // دکمه‌های حالت مداد (Toggle Pencil Mode)
     keyboard.push([
-      { text: "1️⃣", callback_data: `set_${r}_${c}_1` },
-      { text: "2️⃣", callback_data: `set_${r}_${c}_2` },
-      { text: "3️⃣", callback_data: `set_${r}_${c}_3` },
-      { text: "4️⃣", callback_data: `set_${r}_${c}_4` },
-      { text: "5️⃣", callback_data: `set_${r}_${c}_5` }
+      { 
+        text: gameState.pencilMode ? "✏️ حالت مداد: روشن" : "✏️ حالت مداد: خاموش", 
+        callback_data: "toggle_pencil" 
+      }
     ]);
+
+    // اعداد ۱ تا ۵
     keyboard.push([
-      { text: "6️⃣", callback_data: `set_${r}_${c}_6` },
-      { text: "7️⃣", callback_data: `set_${r}_${c}_7` },
-      { text: "8️⃣", callback_data: `set_${r}_${c}_8` },
-      { text: "9️⃣", callback_data: `set_${r}_${c}_9` },
-      { text: "❌ پاک", callback_data: `set_${r}_${c}_0` }
+      { text: "1️⃣", callback_data: `input_${r}_${c}_1` },
+      { text: "2️⃣", callback_data: `input_${r}_${c}_2` },
+      { text: "3️⃣", callback_data: `input_${r}_${c}_3` },
+      { text: "4️⃣", callback_data: `input_${r}_${c}_4` },
+      { text: "5️⃣", callback_data: `input_${r}_${c}_5` }
+    ]);
+    // اعداد ۶ تا ۹ و پاک کردن
+    keyboard.push([
+      { text: "6️⃣", callback_data: `input_${r}_${c}_6` },
+      { text: "7️⃣", callback_data: `input_${r}_${c}_7` },
+      { text: "8️⃣", callback_data: `input_${r}_${c}_8` },
+      { text: "9️⃣", callback_data: `input_${r}_${c}_9` },
+      { text: "🗑 پاک", callback_data: `input_${r}_${c}_0` }
     ]);
   }
 
+  // دکمه‌های کنترل کلی بازی
   keyboard.push([
     { text: "🔄 بازی جدید", callback_data: "new_game" },
-    { text: "💡 راهنما", callback_data: "help_game" }
+    { text: `خطاها: ${gameState.mistakes}/${gameState.maxMistakes}`, callback_data: "noop" }
   ]);
 
   return keyboard;
 }
 
 // ----------------------------------------------------
-// مدیریت درخواست‌ها
+// 3. Telegram Handlers & Game Logic Execution
 // ----------------------------------------------------
 async function handleInlineQuery(inlineQuery, token) {
   const queryId = inlineQuery.id;
-  const puzzle = generateSudoku();
-  const keyboard = buildSudokuKeyboard(puzzle, null);
+  const gameState = generateNewGame();
+  activeGames.set('inline_' + queryId, gameState);
+
+  const keyboard = buildSudokuKeyboard(gameState, null);
 
   const results = [
     {
       type: 'article',
       id: 'sudoku_' + Date.now(),
-      title: '🧩 شروع بازی سودوکو',
-      description: 'برای ارسال جدول سودوکو به گروه کلیک کنید',
+      title: '🧩 شروع بازی استاندارد سودوکو',
+      description: 'ارسال جدول سودوکو به گروه با رعایت کامل قوانین',
       input_message_content: {
-        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای بازی روی خانه‌های جدول کلیک کنید تا انتخاب شوند، سپس عدد مورد نظر را از پایین انتخاب کنید.\n\n⚠️ *توجه: برای بازی باید عضو کانال‌های زیر باشید:* \n@nwechannell \n@parvapoem",
+        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای بازی روی خانه‌های جدول کلیک کنید تا انتخاب شوند، سپس عدد یا یادداشت مدادی خود را از پایین صفحه وارد کنید.\n\n⚠️ *توجه: برای بازی باید عضو کانال‌های زیر باشید:* \n@nwechannell \n@parvapoem",
         parse_mode: 'Markdown'
       },
       reply_markup: {
@@ -187,7 +242,9 @@ async function checkUserMembership(userId, token) {
   return true;
 }
 
-const activePuzzles = new Map();
+// ذخیره‌سازی وضعیت بازی‌ها در حافظه Worker
+const activeGames = new Map();
+const selectedCellsMap = new Map();
 
 async function handleCallbackQuery(callbackQuery, token) {
   const userId = callbackQuery.from.id;
@@ -233,26 +290,104 @@ async function handleCallbackQuery(callbackQuery, token) {
     messageKey = `${callbackQuery.message.chat.id}_${callbackQuery.message.message_id}`;
   }
 
-  if (!activePuzzles.has(messageKey)) {
-    activePuzzles.set(messageKey, generateSudoku());
+  if (!activeGames.has(messageKey)) {
+    activeGames.set(messageKey, generateNewGame());
   }
-  let puzzle = activePuzzles.get(messageKey);
-
-  let selectedCell = null;
+  let gameState = activeGames.get(messageKey);
+  let selectedCell = selectedCellsMap.get(messageKey) || null;
 
   if (data === 'new_game') {
-    puzzle = generateSudoku();
-    activePuzzles.set(messageKey, puzzle);
+    gameState = generateNewGame();
+    activeGames.set(messageKey, gameState);
+    selectedCell = null;
+    selectedCellsMap.set(messageKey, null);
+  } else if (data === 'toggle_pencil') {
+    gameState.pencilMode = !gameState.pencilMode;
   } else if (data.startsWith('select_')) {
     const [, r, c] = data.split('_');
     selectedCell = { r: parseInt(r), c: parseInt(c) };
-  } else if (data.startsWith('set_')) {
-    const [, r, c, val] = data.split('_');
-    puzzle[r][c] = parseInt(val);
-    activePuzzles.set(messageKey, puzzle);
+    selectedCellsMap.set(messageKey, selectedCell);
+  } else if (data.startsWith('input_')) {
+    const [, rStr, cStr, valStr] = data.split('_');
+    const r = parseInt(rStr);
+    const c = parseInt(cStr);
+    const val = parseInt(valStr);
+    let cell = gameState.board[r][c];
+
+    // خانه‌های Given قابل تغییر نیستند
+    if (!cell.given) {
+      if (gameState.pencilMode) {
+        // حالت مداد (Pencil Mark)
+        if (val === 0) {
+          cell.notes = [];
+        } else {
+          if (cell.notes.includes(val)) {
+            cell.notes = cell.notes.filter(n => n !== val);
+          } else {
+            cell.notes.push(val);
+          }
+        }
+      } else {
+        // حالت ورود عدد اصلی (Value Mode)
+        if (val === 0) {
+          cell.value = null;
+          cell.isError = false;
+        } else {
+          cell.value = val;
+          cell.notes = []; // پاک کردن یادداشت‌ها هنگام ورود عدد قطعی
+
+          // تفکیک دقیق Valid Move از Correct Move
+          // بررسی خطای محلی بر اساس مقادیر فعلی جدول
+          let tempVals = gameState.board.map(row => row.map(cell => cell.value));
+          tempVals[r][c] = null; // موقتاً خالی کنیم تا خودش با خودش مقایسه نشود
+          let isValidLocal = isValid(tempVals, r, c, val);
+
+          if (!isValidLocal) {
+            cell.isError = true;
+            gameState.mistakes++;
+          } else if (val !== cell.solutionValue) {
+            // حرکت معتبر است ولی با جواب نهایی تطابق ندارد (حالت Allow With Error)
+            cell.isError = true;
+            gameState.mistakes++;
+          } else {
+            cell.isError = false;
+            // پاکسازی خودکار کاندیداهای مرتبط در صورت فعال بودن Auto Pencil Cleanup
+            for (let i = 0; i < 9; i++) {
+              gameState.board[r][i].notes = gameState.board[r][i].notes.filter(n => n !== val);
+              gameState.board[i][c].notes = gameState.board[i][c].notes.filter(n => n !== val);
+            }
+            const startRow = Math.floor(r / 3) * 3;
+            const startCol = Math.floor(c / 3) * 3;
+            for (let br = 0; br < 3; br++) {
+              for (let bc = 0; bc < 3; bc++) {
+                gameState.board[startRow + br][startCol + bc].notes = gameState.board[startRow + br][startCol + bc].notes.filter(n => n !== val);
+              }
+            }
+          }
+        }
+      }
+
+      // بررسی وضعیت پایان بازی (COMPLETED یا FAILED)
+      if (gameState.mistakes >= gameState.maxMistakes) {
+        gameState.status = 'FAILED';
+      } else {
+        let isComplete = true;
+        let isAllCorrect = true;
+        for (let row = 0; row < 9; row++) {
+          for (let col = 0; col < 9; col++) {
+            let cl = gameState.board[row][col];
+            if (cl.value === null) isComplete = false;
+            if (cl.value !== cl.solutionValue) isAllCorrect = false;
+          }
+        }
+        if (isComplete && isAllCorrect) {
+          gameState.status = 'COMPLETED';
+        }
+      }
+    }
   }
 
-  editPayload.reply_markup = { inline_keyboard: buildSudokuKeyboard(puzzle, selectedCell) };
+  editPayload.reply_markup = { inline_keyboard: buildSudokuKeyboard(gameState, selectedCell) };
 
   await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
     method: 'POST',
