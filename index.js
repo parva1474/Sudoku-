@@ -42,7 +42,7 @@ async function handleInlineQuery(inlineQuery, token) {
       title: '🧩 شروع بازی سودوکو',
       description: 'برای ارسال جدول سودوکو به گروه کلیک کنید',
       input_message_content: {
-        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای بازی روی خانه‌های جدول کلیک کنید.\n\n⚠️ *توجه: برای بازی باید عضو کانال‌های زیر باشید:* \n@nwechannell \n@parvapoem",
+        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای بازی روی خانه‌های جدول کلیک کنید.",
         parse_mode: 'Markdown'
       },
       reply_markup: {
@@ -105,6 +105,8 @@ async function handleCallbackQuery(callbackQuery, token) {
 
   if (data.startsWith('cell_')) {
     const [, r, c] = data.split('_');
+    // برای جلوگیری از خطا، یک جدول نمونه می‌سازیم تا کیبورد اعداد لود شود
+    const puzzle = generateSudoku();
     const numberKeyboard = buildNumberKeyboard(r, c);
 
     await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
@@ -117,7 +119,20 @@ async function handleCallbackQuery(callbackQuery, token) {
       })
     });
   } 
-  else if (data === 'back_to_board' || data === 'new_game') {
+  else if (data === 'back_to_board' || data === 'new_game' || data === 'help_game') {
+    if (data === 'help_game') {
+      await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          callback_query_id: callbackQuery.id,
+          text: "راهنما: روی خانه‌های خالی کلیک کنید و عدد مناسب را از منوی باز شده انتخاب کنید.",
+          show_alert: true
+        })
+      });
+      return;
+    }
+
     const puzzle = generateSudoku();
     const boardKeyboard = buildSudokuKeyboard(puzzle);
 
@@ -147,4 +162,4 @@ async function handleCallbackQuery(callbackQuery, token) {
       })
     });
   }
-}
+        }
