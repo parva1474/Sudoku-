@@ -31,6 +31,8 @@ export default {
 };
 
 async function handleInlineQuery(inlineQuery, token) {
+  console.log("🔥 INLINE QUERY RECEIVED:", JSON.stringify(inlineQuery));
+
   const queryId = inlineQuery.id;
   const puzzle = generateSudoku();
   const keyboard = buildSudokuKeyboard(puzzle);
@@ -107,7 +109,6 @@ async function handleCallbackQuery(callbackQuery, token) {
     body: JSON.stringify({ callback_query_id: callbackQuery.id })
   });
 
-  // ۱. کلیک روی خانه جدول برای انتخاب عدد
   if (data.startsWith('cell_')) {
     const [, r, c] = data.split('_');
     const numberKeyboard = buildNumberKeyboard(r, c);
@@ -122,7 +123,6 @@ async function handleCallbackQuery(callbackQuery, token) {
       })
     });
   } 
-  // ۲. درخواست بازی جدید یا بازگشت به جدول
   else if (data === 'back_to_board' || data === 'new_game') {
     const puzzle = generateSudoku();
     const boardKeyboard = buildSudokuKeyboard(puzzle);
@@ -137,10 +137,8 @@ async function handleCallbackQuery(callbackQuery, token) {
       })
     });
   }
-  // ۳. ثبت عدد انتخاب شده روی جدول
   else if (data.startsWith('set_')) {
     const [, r, c, val] = data.split('_');
-    // ساخت موقت جدول جدید برای نمایش تغییر (در گام‌های بعدی می‌توانید KV را متصل کنید)
     const puzzle = generateSudoku();
     puzzle[r][c] = parseInt(val);
     const boardKeyboard = buildSudokuKeyboard(puzzle);
