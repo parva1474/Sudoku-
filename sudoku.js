@@ -1,5 +1,4 @@
-// تابع تولید خودکار و الگوریتمی جدول سودوکو
-function createBaseSudoku() {
+export function generateSudoku() {
   const base = [
     [1, 2, 3, 4, 5, 6, 7, 8, 9],
     [4, 5, 6, 7, 8, 9, 1, 2, 3],
@@ -11,25 +10,10 @@ function createBaseSudoku() {
     [6, 4, 5, 9, 7, 8, 3, 1, 2],
     [9, 7, 8, 3, 1, 2, 6, 4, 5]
   ];
-  
-  // به هم ریختن تصادفی برای ایجاد یک جدول کاملاً جدید و معتبر
-  for (let i = 0; i < 5; i++) {
-    const n1 = Math.floor(Math.random() * 3);
-    const n2 = Math.floor(Math.random() * 3);
-    const block = Math.floor(Math.random() * 3);
-    
-    // جابجایی سطرها درون بلوک‌ها
-    let row1 = block * 3 + n1;
-    let row2 = block * 3 + n2;
-    let temp = base[row1];
-    base[row1] = base[row2];
-    base[row2] = temp;
-  }
 
-  // پنهان کردن تعدادی از خانه‌ها برای تبدیل به معما (صفر کردن)
   let puzzle = base.map(row => [...row]);
   let removedCount = 0;
-  while (removedCount < 40) { // حذف حدود 40 خانه برای ایجاد سختی استاندارد
+  while (removedCount < 35) {
     let r = Math.floor(Math.random() * 9);
     let c = Math.floor(Math.random() * 9);
     if (puzzle[r][c] !== 0) {
@@ -41,33 +25,15 @@ function createBaseSudoku() {
   return puzzle;
 }
 
-export function generateSudoku() {
-  return createBaseSudoku();
-}
-
-// تفکیک بلوک‌های ۳ در ۳ با اموجی‌های متنوع برای زیبایی و خوانایی
 export function buildSudokuKeyboard(board, selectedCell = null) {
   let keyboard = [];
+  const emojis = ['⬛', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'];
 
   for (let r = 0; r < 9; r++) {
     let row = [];
     for (let c = 0; c < 9; c++) {
       let val = board[r][c];
-      
-      let boxBlock = Math.floor(r / 3) * 3 + Math.floor(c / 3);
-      let blockEmojis = [
-        ['⬛', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'],
-        ['⬜', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'],
-        ['◼️', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'],
-        ['◻️', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'],
-        ['🟧', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'],
-        ['🟦', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'],
-        ['🟨', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'],
-        ['🟪', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'],
-        ['🟩', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣']
-      ];
-
-      let text = val === 0 ? blockEmojis[boxBlock][0] : ['▫️','1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣'][val];
+      let text = emojis[val];
 
       if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
         text = '🔘';
