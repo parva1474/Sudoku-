@@ -1,4 +1,3 @@
-// بانک معماهای استاندارد سودوکو
 const sudokuBank = [
   [
     [5, 3, 0, 0, 7, 0, 0, 0, 0],
@@ -29,7 +28,6 @@ export function generateSudoku() {
   return sudokuBank[randomIndex].map(row => [...row]);
 }
 
-// ساخت کیبورد جدول سودوکو
 export function buildSudokuKeyboard(board, selectedCell = null) {
   const numberEmojis = ['▫️', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'];
   let keyboard = [];
@@ -40,7 +38,6 @@ export function buildSudokuKeyboard(board, selectedCell = null) {
       let val = board[r][c];
       let text = numberEmojis[val];
 
-      // اگر این خانه انتخاب شده باشد، نشانگر بگذاریم
       if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
         text = '🔘';
       }
@@ -60,7 +57,6 @@ export function buildSudokuKeyboard(board, selectedCell = null) {
   return keyboard;
 }
 
-// ساخت کیبورد اعداد برای وارد کردن به خانه انتخاب شده
 export function buildNumberKeyboard(r, c) {
   return [
     [
@@ -79,8 +75,8 @@ export function buildNumberKeyboard(r, c) {
       { text: "9️⃣", callback_data: `set_${r}_${c}_9` }
     ],
     [
-      { text: "❌ پاک کردن خانه", callback_data: `set_${r}_${c}_0` },
-      { text: "🔙 بازگشت به جدول", callback_data: "back_to_board" }
+      { text: "❌ پاک کردن", callback_data: `set_${r}_${c}_0` },
+      { text: "🔙 بازگشت", callback_data: "back_to_board" }
     ]
   ];
 }
