@@ -25,36 +25,62 @@ export default {
 };
 
 // ----------------------------------------------------
-// توابع بازی سودوکو و بلاک‌بندی ۳ در ۳
+// الگوریتم استاندارد و واقعی تولید سودوکو
 // ----------------------------------------------------
-function generateSudoku() {
-  const base = [
-    [1, 2, 3, 4, 5, 6, 7, 8, 9],
-    [4, 5, 6, 7, 8, 9, 1, 2, 3],
-    [7, 8, 9, 1, 2, 3, 4, 5, 6],
-    [2, 3, 1, 5, 6, 4, 8, 9, 7],
-    [5, 6, 4, 8, 9, 7, 2, 3, 1],
-    [8, 9, 7, 2, 3, 1, 5, 6, 4],
-    [3, 1, 2, 6, 4, 5, 9, 7, 8],
-    [6, 4, 5, 9, 7, 8, 3, 1, 2],
-    [9, 7, 8, 3, 1, 2, 6, 4, 5]
-  ];
+function isValid(board, row, col, num) {
+  for (let i = 0; i < 9; i++) {
+    if (board[row][i] === num && i !== col) return false;
+    if (board[i][col] === num && i !== row) return false;
+  }
+  const startRow = Math.floor(row / 3) * 3;
+  const startCol = Math.floor(col / 3) * 3;
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      let currR = startRow + r;
+      let currC = startCol + c;
+      if (board[currR][currC] === num && (currR !== row || currC !== col)) return false;
+    }
+  }
+  return true;
+}
 
-  let puzzle = base.map(row => [...row]);
+function solveSudoku(board) {
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      if (board[r][c] === 0) {
+        let nums = [1, 2, 3, 4, 5, 6, 7, 8, 9].sort(() => Math.random() - 0.5);
+        for (let num of nums) {
+          if (isValid(board, r, c, num)) {
+            board[r][c] = num;
+            if (solveSudoku(board)) return true;
+            board[r][c] = 0;
+          }
+        }
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function generateSudoku() {
+  let board = Array(9).fill(0).map(() => Array(9).fill(0));
+  solveSudoku(board);
+
+  // حذف ۳۵ خانه برای ایجاد معما
   let removedCount = 0;
   while (removedCount < 35) {
     let r = Math.floor(Math.random() * 9);
     let c = Math.floor(Math.random() * 9);
-    if (puzzle[r][c] !== 0) {
-      puzzle[r][c] = 0;
+    if (board[r][c] !== 0) {
+      board[r][c] = 0;
       removedCount++;
     }
   }
-
-  return puzzle;
+  return board;
 }
 
-// ساخت کیبورد با بلوک‌بندی ۳ تایی و کلیدهای اعداد در پایین صفحه
+// ساخت کیبورد با تفکیک تمیز ۳ در ۳ بدون خط‌چین اضافی
 function buildSudokuKeyboard(board, selectedCell = null) {
   let keyboard = [];
   const emojis = ['⬛', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'];
@@ -65,7 +91,6 @@ function buildSudokuKeyboard(board, selectedCell = null) {
       let val = board[r][c];
       let text = emojis[val];
 
-      // اگر این خانه انتخاب شده باشد، دور آن علامت می‌گذاریم
       if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
         text = '📍 ' + text;
       }
@@ -77,15 +102,15 @@ function buildSudokuKeyboard(board, selectedCell = null) {
     }
     keyboard.push(row);
 
-    // ایجاد فاصله و بلوک‌بندی بصری بعد از سطرهای 3 و 6
+    // ایجاد فاصله استاندارد بین بلوک‌های ۳ در ۳ بدون خط و خط‌چین
     if (r === 2 || r === 5) {
       keyboard.push([
-        { text: "➖ ➖ ➖ ➖ ➖ ➖ ➖ ➖ ➖", callback_data: "noop" }
+        { text: "🔹 🔹 🔹 🔹 🔹 🔹 🔹 🔹 🔹", callback_data: "noop" }
       ]);
     }
   }
 
-  // اگر خانه‌ای انتخاب شده باشد، کیبورد اعداد را زیر جدول نمایش می‌دهیم
+  // کیبورد اعداد در پایین صفحه
   if (selectedCell) {
     const { r, c } = selectedCell;
     keyboard.push([
@@ -104,7 +129,6 @@ function buildSudokuKeyboard(board, selectedCell = null) {
     ]);
   }
 
-  // دکمه‌های کنترلی پایانی
   keyboard.push([
     { text: "🔄 بازی جدید", callback_data: "new_game" },
     { text: "💡 راهنما", callback_data: "help_game" }
@@ -163,7 +187,6 @@ async function checkUserMembership(userId, token) {
   return true;
 }
 
-// متغیر موقت برای نگهداری وضعیت جدول‌ها در حافظه Worker
 const activePuzzles = new Map();
 
 async function handleCallbackQuery(callbackQuery, token) {
@@ -236,4 +259,4 @@ async function handleCallbackQuery(callbackQuery, token) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(editPayload)
   });
-    }
+}
