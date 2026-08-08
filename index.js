@@ -33,8 +33,7 @@ export default {
 async function handleInlineQuery(inlineQuery, token) {
   const queryId = inlineQuery.id;
   const puzzle = generateSudoku();
-  const boardString = encodeBoard(puzzle);
-  const keyboard = buildSudokuKeyboard(puzzle, null, boardString);
+  const keyboard = buildSudokuKeyboard(puzzle);
 
   const results = [
     {
@@ -104,16 +103,9 @@ async function handleCallbackQuery(callbackQuery, token) {
     body: JSON.stringify({ callback_query_id: callbackQuery.id })
   });
 
-  const parts = data.split('_');
-  const action = parts[0];
-
-  if (action === 'cell') {
-    const r = parseInt(parts[1]);
-    const c = parseInt(parts[2]);
-    const boardString = parts[3];
-    const puzzle = decodeBoard(boardString);
-
-    const numberKeyboard = buildNumberKeyboard(r, c, boardString);
+  if (data.startsWith('cell_')) {
+    const [, r, c] = data.split('_');
+    const numberKeyboard = buildNumberKeyboard(r, c);
 
     await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
       method: 'POST',
@@ -125,10 +117,9 @@ async function handleCallbackQuery(callbackQuery, token) {
       })
     });
   } 
-  else if (action === 'back' || action === 'new') {
+  else if (data === 'back_to_board' || data === 'new_game') {
     const puzzle = generateSudoku();
-    const boardString = encodeBoard(puzzle);
-    const boardKeyboard = buildSudokuKeyboard(puzzle, null, boardString);
+    const boardKeyboard = buildSudokuKeyboard(puzzle);
 
     await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
       method: 'POST',
@@ -140,17 +131,11 @@ async function handleCallbackQuery(callbackQuery, token) {
       })
     });
   }
-  else if (action === 'set') {
-    const r = parseInt(parts[1]);
-    const c = parseInt(parts[2]);
-    const val = parseInt(parts[3]);
-    const boardString = parts[4];
-    
-    const puzzle = decodeBoard(boardString);
-    puzzle[r][c] = val;
-
-    const newBoardString = encodeBoard(puzzle);
-    const boardKeyboard = buildSudokuKeyboard(puzzle, null, newBoardString);
+  else if (data.startsWith('set_')) {
+    const [, r, c, val] = data.split('_');
+    const puzzle = generateSudoku();
+    puzzle[r][c] = parseInt(val);
+    const boardKeyboard = buildSudokuKeyboard(puzzle);
 
     await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
       method: 'POST',
@@ -163,19 +148,3 @@ async function handleCallbackQuery(callbackQuery, token) {
     });
   }
 }
-
-function encodeBoard(board) {
-  return board.flat().join('');
-}
-
-function decodeBoard(str) {
-  let board = [];
-  for (let i = 0; i < 9; i++) {
-    let row = [];
-    for (let j = 0; j < 9; j++) {
-      row.push(parseInt(str[i * 9 + j]));
-    }
-    board.push(row);
-  }
-  return board;
-    }
