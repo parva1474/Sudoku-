@@ -105,8 +105,6 @@ async function handleCallbackQuery(callbackQuery, token) {
 
   if (data.startsWith('cell_')) {
     const [, r, c] = data.split('_');
-    // برای جلوگیری از خطا، یک جدول نمونه می‌سازیم تا کیبورد اعداد لود شود
-    const puzzle = generateSudoku();
     const numberKeyboard = buildNumberKeyboard(r, c);
 
     await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
@@ -119,20 +117,7 @@ async function handleCallbackQuery(callbackQuery, token) {
       })
     });
   } 
-  else if (data === 'back_to_board' || data === 'new_game' || data === 'help_game') {
-    if (data === 'help_game') {
-      await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          callback_query_id: callbackQuery.id,
-          text: "راهنما: روی خانه‌های خالی کلیک کنید و عدد مناسب را از منوی باز شده انتخاب کنید.",
-          show_alert: true
-        })
-      });
-      return;
-    }
-
+  else if (data === 'back_to_board' || data === 'new_game') {
     const puzzle = generateSudoku();
     const boardKeyboard = buildSudokuKeyboard(puzzle);
 
@@ -143,6 +128,17 @@ async function handleCallbackQuery(callbackQuery, token) {
         chat_id: chatId,
         message_id: messageId,
         reply_markup: { inline_keyboard: boardKeyboard }
+      })
+    });
+  }
+  else if (data === 'help_game') {
+    await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        callback_query_id: callbackQuery.id,
+        text: "راهنما: روی هر خانه از جدول کلیک کنید تا اعداد ظاهر شوند.",
+        show_alert: true
       })
     });
   }
@@ -162,4 +158,4 @@ async function handleCallbackQuery(callbackQuery, token) {
       })
     });
   }
-        }
+}
