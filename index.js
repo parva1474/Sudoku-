@@ -50,7 +50,8 @@ export default {
   console.log("Telegram Answer Response:", data);
       }
       // ۲. مدیریت کلیک روی دکمه‌ها
-      else if (update.callback_query) {
+      else if (update.callback_query) }
+        
         await handleCallbackQuery(update.callback_query, token);
       }
 
