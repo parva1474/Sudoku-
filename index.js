@@ -16,10 +16,39 @@ export default {
         return new Response('BOT_TOKEN is not set in environment variables', { status: 500 });
       }
 
-      // ۱. مدیریت حالت اینلاین (وقتی کاربر ربات را در گروه منشن می‌کند)
-      if (update.inline_query) {
-        await handleInlineQuery(update.inline_query, token);
-      } 
+      async function handleInlineQuery(inlineQuery, token) {
+  const queryId = inlineQuery.id;
+  const puzzle = generateSudoku();
+  const keyboard = buildSudokuKeyboard(puzzle);
+
+  const results = [
+    {
+      type: 'article',
+      id: '1',
+      title: '🧩 شروع بازی سودوکو',
+      input_message_content: {
+        message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای بازی روی خانه‌های جدول کلیک کنید.\n\n⚠️ *توجه: برای بازی باید عضو کانال‌های زیر باشید:* \n@nwechannell \n@parvapoem",
+        parse_mode: 'Markdown'
+      },
+      reply_markup: {
+        inline_keyboard: keyboard
+      }
+    }
+  ];
+
+  const response = await fetch(`https://api.telegram.org/bot${token}/answerInlineQuery`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      inline_query_id: queryId,
+      results: results,
+      cache_time: 0
+    })
+  });
+  
+  const data = await response.json();
+  console.log("Telegram Answer Response:", data);
+      }
       // ۲. مدیریت کلیک روی دکمه‌ها
       else if (update.callback_query) {
         await handleCallbackQuery(update.callback_query, token);
