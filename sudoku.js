@@ -25,7 +25,7 @@ export function generateSudoku() {
   return puzzle;
 }
 
-export function buildSudokuKeyboard(board, selectedCell = null) {
+export function buildSudokuKeyboard(board, selectedCell = null, boardString = '') {
   let keyboard = [];
   const emojis = ['⬛', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'];
 
@@ -35,13 +35,9 @@ export function buildSudokuKeyboard(board, selectedCell = null) {
       let val = board[r][c];
       let text = emojis[val];
 
-      if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
-        text = '🔘';
-      }
-
       row.push({
         text: text,
-        callback_data: `cell_${r}_${c}`
+        callback_data: `cell_${r}_${c}_${boardString}`
       });
     }
     keyboard.push(row);
@@ -55,26 +51,26 @@ export function buildSudokuKeyboard(board, selectedCell = null) {
   return keyboard;
 }
 
-export function buildNumberKeyboard(r, c) {
+export function buildNumberKeyboard(r, c, boardString) {
   return [
     [
-      { text: "1️⃣", callback_data: `set_${r}_${c}_1` },
-      { text: "2️⃣", callback_data: `set_${r}_${c}_2` },
-      { text: "3️⃣", callback_data: `set_${r}_${c}_3` }
+      { text: "1️⃣", callback_data: `set_${r}_${c}_1_${boardString}` },
+      { text: "2️⃣", callback_data: `set_${r}_${c}_2_${boardString}` },
+      { text: "3️⃣", callback_data: `set_${r}_${c}_3_${boardString}` }
     ],
     [
-      { text: "4️⃣", callback_data: `set_${r}_${c}_4` },
-      { text: "5️⃣", callback_data: `set_${r}_${c}_5` },
-      { text: "6️⃣", callback_data: `set_${r}_${c}_6` }
+      { text: "4️⃣", callback_data: `set_${r}_${c}_4_${boardString}` },
+      { text: "5️⃣", callback_data: `set_${r}_${c}_5_${boardString}` },
+      { text: "6️⃣", callback_data: `set_${r}_${c}_6_${boardString}` }
     ],
     [
-      { text: "7️⃣", callback_data: `set_${r}_${c}_7` },
-      { text: "8️⃣", callback_data: `set_${r}_${c}_8` },
-      { text: "9️⃣", callback_data: `set_${r}_${c}_9` }
+      { text: "7️⃣", callback_data: `set_${r}_${c}_7_${boardString}` },
+      { text: "8️⃣", callback_data: `set_${r}_${c}_8_${boardString}` },
+      { text: "9️⃣", callback_data: `set_${r}_${c}_9_${boardString}` }
     ],
     [
-      { text: "❌ پاک کردن", callback_data: `set_${r}_${c}_0` },
-      { text: "🔙 بازگشت به جدول", callback_data: "back_to_board" }
+      { text: "❌ پاک کردن", callback_data: `set_${r}_${c}_0_${boardString}` },
+      { text: "🔙 بازگشت به جدول", callback_data: `back_board_${boardString}` }
     ]
   ];
 }
