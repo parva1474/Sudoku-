@@ -1,3 +1,4 @@
+const BOT_TOKEN = '8604292634:AAHBsJ9HXgISutUw6S0qTRcOWi08nn38ZuY';
 const REQUIRED_CHANNELS = ['@nwechannell', '@parvapoem'];
 
 export default {
@@ -8,16 +9,11 @@ export default {
 
     try {
       const update = await request.json();
-      const token = env.BOT_TOKEN;
-
-      if (!token) {
-        return new Response('BOT_TOKEN is not set', { status: 500 });
-      }
 
       if (update.inline_query) {
-        await handleInlineQuery(update.inline_query, token);
+        await handleInlineQuery(update.inline_query, BOT_TOKEN);
       } else if (update.callback_query) {
-        await handleCallbackQuery(update.callback_query, token);
+        await handleCallbackQuery(update.callback_query, BOT_TOKEN);
       }
 
       return new Response('OK');
@@ -28,7 +24,9 @@ export default {
   }
 };
 
-// تابع ساخت جدول سودوکو
+// ----------------------------------------------------
+// توابع بازی سودوکو
+// ----------------------------------------------------
 function generateSudoku() {
   const base = [
     [1, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -56,7 +54,6 @@ function generateSudoku() {
   return puzzle;
 }
 
-// ساخت کیبورد جدول
 function buildSudokuKeyboard(board) {
   let keyboard = [];
   const emojis = ['⬛', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'];
@@ -83,7 +80,6 @@ function buildSudokuKeyboard(board) {
   return keyboard;
 }
 
-// ساخت کیبورد انتخاب عدد
 function buildNumberKeyboard(r, c) {
   return [
     [
@@ -108,6 +104,9 @@ function buildNumberKeyboard(r, c) {
   ];
 }
 
+// ----------------------------------------------------
+// توابع مدیریت درخواست‌ها
+// ----------------------------------------------------
 async function handleInlineQuery(inlineQuery, token) {
   const queryId = inlineQuery.id;
   const puzzle = generateSudoku();
@@ -158,9 +157,8 @@ async function checkUserMembership(userId, token) {
 async function handleCallbackQuery(callbackQuery, token) {
   const userId = callbackQuery.from.id;
   const data = callbackQuery.data;
-  const chatId = callbackQuery.message.chat.id;
-  const messageId = callbackQuery.message.message_id;
 
+  // بررسی عضویت
   const isMember = await checkUserMembership(userId, token);
   if (!isMember) {
     await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
@@ -175,54 +173,53 @@ async function handleCallbackQuery(callbackQuery, token) {
     return;
   }
 
+  // حذف علامت لودینگ دکمه
   await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ callback_query_id: callbackQuery.id })
   });
 
+  // ساختار لازم برای تغییر دکمه پیام‌ها چه در ربات چه در گروه‌ها (حالت اینلاین)
+  let editPayload = {};
+  if (callbackQuery.inline_message_id) {
+    editPayload.inline_message_id = callbackQuery.inline_message_id;
+  } else if (callbackQuery.message) {
+    editPayload.chat_id = callbackQuery.message.chat.id;
+    editPayload.message_id = callbackQuery.message.message_id;
+  }
+
+  // دقیقاً همان منطقی که گفتید سالم است
   if (data.startsWith('cell_')) {
     const [, r, c] = data.split('_');
-    const numberKeyboard = buildNumberKeyboard(r, c);
+    editPayload.reply_markup = { inline_keyboard: buildNumberKeyboard(r, c) };
 
     await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        message_id: messageId,
-        reply_markup: { inline_keyboard: numberKeyboard }
-      })
+      body: JSON.stringify(editPayload)
     });
   } 
   else if (data === 'back_to_board' || data === 'new_game') {
     const puzzle = generateSudoku();
-    const boardKeyboard = buildSudokuKeyboard(puzzle);
+    editPayload.reply_markup = { inline_keyboard: buildSudokuKeyboard(puzzle) };
 
     await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        message_id: messageId,
-        reply_markup: { inline_keyboard: boardKeyboard }
-      })
+      body: JSON.stringify(editPayload)
     });
   }
   else if (data.startsWith('set_')) {
     const [, r, c, val] = data.split('_');
     const puzzle = generateSudoku();
     puzzle[r][c] = parseInt(val);
-    const boardKeyboard = buildSudokuKeyboard(puzzle);
+    editPayload.reply_markup = { inline_keyboard: buildSudokuKeyboard(puzzle) };
 
     await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        message_id: messageId,
-        reply_markup: { inline_keyboard: boardKeyboard }
-      })
+      body: JSON.stringify(editPayload)
     });
   }
 }
