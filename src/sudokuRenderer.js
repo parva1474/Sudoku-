@@ -1,18 +1,57 @@
 // ==========================================
-// sudokuRenderer.js
-// رندر جدول سودوکو به صورت SVG
+// src/sudokuRenderer.js
+// رندر حرفه‌ای جدول سودوکو
 // ==========================================
 
 const SIZE = 9;
-const CELL_SIZE = 60;
 
+// اندازه هر خانه
+const CELL_SIZE = 70;
+
+// اندازه کل گرید
 const GRID_SIZE = SIZE * CELL_SIZE;
 
+// فضای پایین برای وضعیت بازی
+const FOOTER_HEIGHT = 55;
 
-/**
- * تبدیل متن به XML-safe
- */
+
+// ==========================================
+// رنگ‌ها
+// ==========================================
+
+const COLORS = {
+
+  background: '#FFFFFF',
+
+  cellA: '#FFFFFF',
+  cellB: '#F3F6FA',
+
+  gridThin: '#B8C0CC',
+
+  gridThick: '#20252B',
+
+  selected: '#D9E9FF',
+
+  selectedBorder: '#1976D2',
+
+  given: '#20252B',
+
+  user: '#1565C0',
+
+  error: '#D32F2F',
+
+  notes: '#68727D',
+
+  footer: '#30343B'
+};
+
+
+// ==========================================
+// Escape XML
+// ==========================================
+
 function escapeXml(value) {
+
   return String(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -22,9 +61,10 @@ function escapeXml(value) {
 }
 
 
-/**
- * رنگ پس‌زمینه خانه
- */
+// ==========================================
+// پس‌زمینه خانه
+// ==========================================
+
 function getCellBackground(
   row,
   col,
@@ -38,17 +78,21 @@ function getCellBackground(
     selectedCell.r === row &&
     selectedCell.c === col
   ) {
-    return '#DDEBFF';
+
+    return COLORS.selected;
   }
 
 
   // خانه دارای خطا
-  if (cell.isError) {
-    return '#FFE0E0';
+  if (
+    cell.isError
+  ) {
+
+    return '#FFE4E4';
   }
 
 
-  // باکس‌های 3×3
+  // رنگ متفاوت برای بلوک‌های 3×3
   const boxRow =
     Math.floor(row / 3);
 
@@ -56,21 +100,22 @@ function getCellBackground(
     Math.floor(col / 3);
 
 
-  // یکی در میان برای جدا شدن باکس‌ها
   if (
     (boxRow + boxCol) % 2 === 0
   ) {
-    return '#FFFFFF';
+
+    return COLORS.cellA;
   }
 
 
-  return '#F5F7FA';
+  return COLORS.cellB;
 }
 
 
-/**
- * رندر اعداد مدادی
- */
+// ==========================================
+// رندر یادداشت‌های مدادی
+// ==========================================
+
 function renderNotes(
   cell,
   x,
@@ -78,9 +123,10 @@ function renderNotes(
 ) {
 
   if (
-    !cell.notes ||
+    !Array.isArray(cell.notes) ||
     cell.notes.length === 0
   ) {
+
     return '';
   }
 
@@ -89,49 +135,58 @@ function renderNotes(
 
 
   for (
-    let index = 0;
-    index < cell.notes.length;
-    index++
+    let number = 1;
+    number <= 9;
+    number++
   ) {
 
-    const number =
-      cell.notes[index];
+    if (
+      !cell.notes.includes(number)
+    ) {
+
+      continue;
+    }
+
+
+    const index =
+      number - 1;
 
 
     const noteRow =
-      Math.floor(
-        (number - 1) / 3
-      );
+      Math.floor(index / 3);
 
 
     const noteCol =
-      (number - 1) % 3;
+      index % 3;
 
 
     const noteX =
       x +
-      10 +
-      noteCol * 18;
+      11 +
+      noteCol * 23;
 
 
     const noteY =
       y +
-      16 +
-      noteRow * 18;
+      15 +
+      noteRow * 22;
 
 
     output += `
+
       <text
         x="${noteX}"
         y="${noteY}"
-        font-size="12"
         font-family="Arial, sans-serif"
+        font-size="15"
+        font-weight="500"
         text-anchor="middle"
         dominant-baseline="middle"
-        fill="#777777"
+        fill="${COLORS.notes}"
       >
         ${number}
       </text>
+
     `;
   }
 
@@ -140,9 +195,10 @@ function renderNotes(
 }
 
 
-/**
- * رندر یک خانه
- */
+// ==========================================
+// رندر یک خانه
+// ==========================================
+
 function renderCell(
   row,
   col,
@@ -152,6 +208,7 @@ function renderCell(
 
   const x =
     col * CELL_SIZE;
+
 
   const y =
     row * CELL_SIZE;
@@ -180,7 +237,7 @@ function renderCell(
 
 
   // ========================================
-  // خانه انتخاب‌شده
+  // مشخص کردن خانه انتخاب‌شده
   // ========================================
 
   if (
@@ -192,13 +249,15 @@ function renderCell(
     output += `
 
       <rect
-        x="${x + 2}"
-        y="${y + 2}"
-        width="${CELL_SIZE - 4}"
-        height="${CELL_SIZE - 4}"
+        x="${x + 3}"
+        y="${y + 3}"
+        width="${CELL_SIZE - 6}"
+        height="${CELL_SIZE - 6}"
+        rx="5"
+        ry="5"
         fill="none"
-        stroke="#2979FF"
-        stroke-width="3"
+        stroke="${COLORS.selectedBorder}"
+        stroke-width="4"
       />
 
     `;
@@ -206,39 +265,26 @@ function renderCell(
 
 
   // ========================================
-  // اعداد مدادی
-  // ========================================
-
-  if (
-    cell.value === null
-  ) {
-
-    output +=
-      renderNotes(
-        cell,
-        x,
-        y
-      );
-  }
-
-
-  // ========================================
   // عدد اصلی
   // ========================================
 
-  else {
+  if (
+    cell.value !== null &&
+    cell.value !== undefined
+  ) {
 
     let textColor =
       cell.given
-        ? '#222222'
-        : '#1769AA';
+        ? COLORS.given
+        : COLORS.user;
 
 
     if (
       cell.isError
     ) {
+
       textColor =
-        '#D32F2F';
+        COLORS.error;
     }
 
 
@@ -247,9 +293,9 @@ function renderCell(
       <text
         x="${x + CELL_SIZE / 2}"
         y="${y + CELL_SIZE / 2 + 2}"
-        font-size="32"
-        font-weight="${cell.given ? '700' : '500'}"
         font-family="Arial, sans-serif"
+        font-size="35"
+        font-weight="${cell.given ? '700' : '500'}"
         text-anchor="middle"
         dominant-baseline="middle"
         fill="${textColor}"
@@ -268,14 +314,27 @@ function renderCell(
       output += `
 
         <circle
-          cx="${x + CELL_SIZE - 10}"
-          cy="${y + 10}"
+          cx="${x + CELL_SIZE - 11}"
+          cy="${y + 11}"
           r="5"
-          fill="#D32F2F"
+          fill="${COLORS.error}"
         />
 
       `;
     }
+
+  } else {
+
+    // ======================================
+    // اعداد مدادی
+    // ======================================
+
+    output +=
+      renderNotes(
+        cell,
+        x,
+        y
+      );
   }
 
 
@@ -283,38 +342,23 @@ function renderCell(
 }
 
 
-/**
- * رسم خطوط جدول
- */
-function renderGridLines() {
+// ==========================================
+// خطوط داخلی معمولی
+// ==========================================
+
+function renderThinGrid() {
 
   let output = '';
 
 
   for (
-    let i = 0;
-    i <= SIZE;
+    let i = 1;
+    i < SIZE;
     i++
   ) {
 
     const position =
       i * CELL_SIZE;
-
-
-    const isBoxLine =
-      i % 3 === 0;
-
-
-    const strokeWidth =
-      isBoxLine
-        ? 4
-        : 1;
-
-
-    const stroke =
-      isBoxLine
-        ? '#222222'
-        : '#999999';
 
 
     // خط عمودی
@@ -325,8 +369,8 @@ function renderGridLines() {
         y1="0"
         x2="${position}"
         y2="${GRID_SIZE}"
-        stroke="${stroke}"
-        stroke-width="${strokeWidth}"
+        stroke="${COLORS.gridThin}"
+        stroke-width="1.5"
       />
 
     `;
@@ -340,8 +384,8 @@ function renderGridLines() {
         y1="${position}"
         x2="${GRID_SIZE}"
         y2="${position}"
-        stroke="${stroke}"
-        stroke-width="${strokeWidth}"
+        stroke="${COLORS.gridThin}"
+        stroke-width="1.5"
       />
 
     `;
@@ -352,9 +396,91 @@ function renderGridLines() {
 }
 
 
-/**
- * تابع اصلی رندر سودوکو
- */
+// ==========================================
+// خطوط ضخیم بلوک‌های 3×3
+// ==========================================
+
+function renderBoxLines() {
+
+  let output = '';
+
+
+  // خطوط مرزی بلوک‌ها
+  const positions = [
+    0,
+    3 * CELL_SIZE,
+    6 * CELL_SIZE,
+    9 * CELL_SIZE
+  ];
+
+
+  for (
+    const position of positions
+  ) {
+
+    // خط عمودی
+    output += `
+
+      <line
+        x1="${position}"
+        y1="0"
+        x2="${position}"
+        y2="${GRID_SIZE}"
+        stroke="${COLORS.gridThick}"
+        stroke-width="5"
+        stroke-linecap="square"
+      />
+
+    `;
+
+
+    // خط افقی
+    output += `
+
+      <line
+        x1="0"
+        y1="${position}"
+        x2="${GRID_SIZE}"
+        y2="${position}"
+        stroke="${COLORS.gridThick}"
+        stroke-width="5"
+        stroke-linecap="square"
+      />
+
+    `;
+  }
+
+
+  return output;
+}
+
+
+// ==========================================
+// قاب بیرونی جدول
+// ==========================================
+
+function renderOuterBorder() {
+
+  return `
+
+    <rect
+      x="2.5"
+      y="2.5"
+      width="${GRID_SIZE - 5}"
+      height="${GRID_SIZE - 5}"
+      fill="none"
+      stroke="${COLORS.gridThick}"
+      stroke-width="5"
+    />
+
+  `;
+}
+
+
+// ==========================================
+// تابع اصلی
+// ==========================================
+
 export function renderSudokuSVG(
   gameState,
   selectedCell = null
@@ -362,10 +488,12 @@ export function renderSudokuSVG(
 
   if (
     !gameState ||
-    !gameState.board
+    !Array.isArray(gameState.board) ||
+    gameState.board.length !== 9
   ) {
+
     throw new Error(
-      'gameState معتبر نیست.'
+      'ساختار جدول سودوکو نامعتبر است.'
     );
   }
 
@@ -374,30 +502,37 @@ export function renderSudokuSVG(
 
 
   // ========================================
-  // رندر 81 خانه
+  // 81 خانه
   // ========================================
 
   for (
     let row = 0;
-    row < SIZE;
+    row < 9;
     row++
   ) {
 
-    for (
-      let col = 0;
-      col < SIZE;
-      col++
+    if (
+      !Array.isArray(gameState.board[row]) ||
+      gameState.board[row].length !== 9
     ) {
 
-      const cell =
-        gameState.board[row][col];
+      throw new Error(
+        `ردیف ${row} جدول نامعتبر است.`
+      );
+    }
 
+
+    for (
+      let col = 0;
+      col < 9;
+      col++
+    ) {
 
       cells +=
         renderCell(
           row,
           col,
-          cell,
+          gameState.board[row][col],
           selectedCell
         );
     }
@@ -405,7 +540,7 @@ export function renderSudokuSVG(
 
 
   // ========================================
-  // وضعیت بازی
+  // متن وضعیت
   // ========================================
 
   let statusText =
@@ -418,62 +553,95 @@ export function renderSudokuSVG(
   ) {
 
     statusText =
-      '🎉 سودوکو کامل شد!';
+      '🎉 جدول کامل شد!';
+  }
+
+
+  if (
+    gameState.status ===
+    'GAME_OVER'
+  ) {
+
+    statusText =
+      '❌ بازی تمام شد';
   }
 
 
   // ========================================
-  // SVG نهایی
+  // SVG
   // ========================================
 
-  const svg = `
+  const totalHeight =
+    GRID_SIZE + FOOTER_HEIGHT;
+
+
+  return `
 
 <svg
   xmlns="http://www.w3.org/2000/svg"
   width="${GRID_SIZE}"
-  height="${GRID_SIZE + 45}"
-  viewBox="0 0 ${GRID_SIZE} ${GRID_SIZE + 45}"
+  height="${totalHeight}"
+  viewBox="0 0 ${GRID_SIZE} ${totalHeight}"
 >
 
+  <!-- ================================= -->
   <!-- پس‌زمینه -->
+  <!-- ================================= -->
 
   <rect
     x="0"
     y="0"
     width="${GRID_SIZE}"
-    height="${GRID_SIZE}"
-    fill="#FFFFFF"
+    height="${totalHeight}"
+    fill="${COLORS.background}"
   />
 
 
-  <!-- خانه‌ها -->
+  <!-- ================================= -->
+  <!-- خانه‌های جدول -->
+  <!-- ================================= -->
 
   ${cells}
 
 
-  <!-- خطوط جدول -->
+  <!-- ================================= -->
+  <!-- خطوط ظریف خانه‌ها -->
+  <!-- ================================= -->
 
-  ${renderGridLines()}
+  ${renderThinGrid()}
 
 
-  <!-- وضعیت -->
+  <!-- ================================= -->
+  <!-- خطوط ضخیم بلوک‌های 3×3 -->
+  <!-- ================================= -->
+
+  ${renderBoxLines()}
+
+
+  <!-- ================================= -->
+  <!-- قاب بیرونی -->
+  <!-- ================================= -->
+
+  ${renderOuterBorder()}
+
+
+  <!-- ================================= -->
+  <!-- وضعیت بازی -->
+  <!-- ================================= -->
 
   <text
     x="${GRID_SIZE / 2}"
-    y="${GRID_SIZE + 27}"
-    font-size="18"
+    y="${GRID_SIZE + 33}"
     font-family="Arial, sans-serif"
+    font-size="20"
     font-weight="600"
     text-anchor="middle"
-    fill="#333333"
+    dominant-baseline="middle"
+    fill="${COLORS.footer}"
   >
     ${escapeXml(statusText)}
   </text>
 
 </svg>
-
-  `;
-
-
-  return svg;
+`;
 }
