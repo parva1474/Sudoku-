@@ -541,9 +541,9 @@ export default {
 
       if (
         update.callback_query
-        console.log(
+        console.log
   'CALLBACK RECEIVED:',
-  JSON.stringify({
+  JSON.stringify
     id: update.callback_query.id,
     data: update.callback_query.data,
     inline_message_id: update.callback_query.inline_message_id,
