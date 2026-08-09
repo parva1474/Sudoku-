@@ -16,6 +16,7 @@ export default {
     try {
       const update = await request.json();
 
+      // ۱. پشتیبانی از دستور /start در چت شخصی
       if (update.message && update.message.text === '/start') {
         const chatId = update.message.chat.id;
         const gameState = generateNewGame();
@@ -28,11 +29,51 @@ export default {
         const keyboard = buildControlKeyboard(gameState, null);
 
         await sendSudokuPhoto(BOT_TOKEN, chatId, svg, keyboard);
-      } else if (update.callback_query) {
+      } 
+      // ۲. پشتیبانی از حالت اینلاین (Inline Query) وقتی کاربر @botname را تایپ می‌کند
+      else if (update.inline_query) {
+        const inlineQuery = update.inline_query;
+        const queryId = inlineQuery.id;
+        const gameState = generateNewGame();
+        const sessionKey = `inline_${queryId}`;
+        
+        activeGames.set(sessionKey, gameState);
+        selectedCellsMap.set(sessionKey, null);
+
+        const svg = renderSudokuSVG(gameState, null);
+        
+        // ارسال عکس یا مقاله اینلاین به تلگرام
+        // نکته: برای اینلاین کوئری معمولاً متن یا عکس با لینک ارسال می‌شود
+        const results = [
+          {
+            type: 'article',
+            id: 'sudoku_' + Date.now(),
+            title: '🧩 شروع بازی سودوکو کلاسیک',
+            description: 'کلیک کنید تا جدول سودوکو برای گروه ارسال شود',
+            input_message_content: {
+              message_text: "🧩 **بازی سودوکو گروهی**\n\nبرای بازی و تعامل با جدول، از دکمه‌های زیر استفاده کنید.",
+              parse_mode: 'Markdown'
+            },
+            reply_markup: buildControlKeyboard(gameState, null)
+          }
+        ];
+
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerInlineQuery`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inline_query_id: queryId,
+            results: results,
+            cache_time: 0
+          })
+        });
+      } 
+      // ۳. مدیریت کلیک روی دکمه‌های شیشه‌ای (Callback Query)
+      else if (update.callback_query) {
         const cq = update.callback_query;
-        const chatId = cq.message.chat.id;
-        const messageId = cq.message.message_id;
-        const sessionKey = `chat_${chatId}`;
+        const chatId = cq.message ? cq.message.chat.id : null;
+        const messageId = cq.message ? cq.message.message_id : null;
+        const sessionKey = chatId ? `chat_${chatId}` : `inline_${cq.inline_message_id}`;
 
         if (!activeGames.has(sessionKey)) {
           activeGames.set(sessionKey, generateNewGame());
@@ -98,7 +139,6 @@ export default {
               }
             }
 
-            // بررسی وضعیت برد
             let isComplete = true;
             let isAllCorrect = true;
             for (let row = 0; row < 9; row++) {
@@ -119,7 +159,9 @@ export default {
         const svg = renderSudokuSVG(gameState, selectedCell);
         const keyboard = buildControlKeyboard(gameState, selectedCell);
 
-        await updateSudokuPhoto(BOT_TOKEN, chatId, messageId, svg, keyboard);
+        if (chatId && messageId) {
+          await updateSudokuPhoto(BOT_TOKEN, chatId, messageId, svg, keyboard);
+        }
       }
 
       return new Response('OK');
