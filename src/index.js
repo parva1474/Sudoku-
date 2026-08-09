@@ -1,6 +1,6 @@
 // ==========================================
 // src/index.js
-// Telegram Sudoku Bot
+// Sudoku Telegram Bot
 // Cloudflare Workers
 // ==========================================
 
@@ -37,7 +37,7 @@ const REQUIRED_CHANNELS = [
 
 
 // ==========================================
-// حافظه بازی‌ها
+// حافظه موقت
 // ==========================================
 
 const activeGames = new Map();
@@ -48,7 +48,7 @@ const userScoresMap = new Map();
 
 
 // ==========================================
-// بررسی عضویت کاربر
+// بررسی عضویت
 // ==========================================
 
 async function checkUserMembership(
@@ -73,6 +73,12 @@ async function checkUserMembership(
 
 
       if (!data.ok) {
+
+        console.error(
+          'Membership API error:',
+          data
+        );
+
         return false;
       }
 
@@ -82,18 +88,19 @@ async function checkUserMembership(
 
 
       if (
-        ['left', 'kicked'].includes(status)
+        status === 'left' ||
+        status === 'kicked'
       ) {
+
         return false;
       }
 
 
-      // اگر restricted باشد ولی هنوز عضو باشد،
-      // اجازه استفاده می‌دهیم.
       if (
         status === 'restricted' &&
         data.result?.is_member !== true
       ) {
+
         return false;
       }
 
@@ -114,22 +121,26 @@ async function checkUserMembership(
 
 
 // ==========================================
-// ساخت Session Key
+// Session Key
 // ==========================================
 
-function getSessionKey(callbackQuery) {
+function getSessionKey(cq) {
 
-  // پیام معمولی داخل گروه / خصوصی
-  if (callbackQuery.message) {
+  if (cq.message) {
 
-    return `chat_${callbackQuery.message.chat.id}`;
+    return (
+      'chat_' +
+      cq.message.chat.id
+    );
   }
 
 
-  // پیام Inline
-  if (callbackQuery.inline_message_id) {
+  if (cq.inline_message_id) {
 
-    return `inline_${callbackQuery.inline_message_id}`;
+    return (
+      'inline_' +
+      cq.inline_message_id
+    );
   }
 
 
@@ -138,29 +149,7 @@ function getSessionKey(callbackQuery) {
 
 
 // ==========================================
-// گرفتن اطلاعات کاربر
-// ==========================================
-
-function getUserInfo(from) {
-
-  const userId =
-    from.id;
-
-  const name =
-    from.first_name ||
-    from.username ||
-    'کاربر';
-
-
-  return {
-    userId,
-    name
-  };
-}
-
-
-// ==========================================
-// ساخت امتیاز اولیه کاربر
+// امتیاز کاربر
 // ==========================================
 
 function ensureUserScore(
@@ -194,35 +183,33 @@ function checkGameCompletion(
   gameState
 ) {
 
-  let isComplete =
-    true;
+  let complete = true;
 
-  let isAllCorrect =
-    true;
+  let correct = true;
 
 
   for (
-    let row = 0;
-    row < 9;
-    row++
+    let r = 0;
+    r < 9;
+    r++
   ) {
 
     for (
-      let col = 0;
-      col < 9;
-      col++
+      let c = 0;
+      c < 9;
+      c++
     ) {
 
       const cell =
-        gameState.board[row][col];
+        gameState.board[r][c];
 
 
       if (
-        cell.value === null
+        cell.value === null ||
+        cell.value === undefined
       ) {
 
-        isComplete =
-          false;
+        complete = false;
       }
 
 
@@ -231,16 +218,15 @@ function checkGameCompletion(
         cell.solutionValue
       ) {
 
-        isAllCorrect =
-          false;
+        correct = false;
       }
     }
   }
 
 
   if (
-    isComplete &&
-    isAllCorrect
+    complete &&
+    correct
   ) {
 
     gameState.status =
@@ -266,15 +252,19 @@ export default {
     ctx
   ) {
 
-    // ======================================
-    // توکن از Cloudflare Secret
-    // ======================================
+    // --------------------------------------
+    // توکن
+    // --------------------------------------
 
     const BOT_TOKEN =
       env.BOT_TOKEN;
 
 
     if (!BOT_TOKEN) {
+
+      console.error(
+        'BOT_TOKEN is missing.'
+      );
 
       return new Response(
         'BOT_TOKEN is not configured.',
@@ -285,9 +275,9 @@ export default {
     }
 
 
-    // ======================================
-    // درخواست‌های غیر POST
-    // ======================================
+    // --------------------------------------
+    // GET
+    // --------------------------------------
 
     if (
       request.method !== 'POST'
@@ -303,6 +293,12 @@ export default {
 
       const update =
         await request.json();
+
+
+      console.log(
+        'UPDATE TYPE:',
+        Object.keys(update)
+      );
 
 
       // ====================================
@@ -333,9 +329,16 @@ export default {
             message.from.id;
 
 
-          // --------------------------------
-          // بررسی عضویت
-          // --------------------------------
+          console.log(
+            'START RECEIVED:',
+            chatId,
+            userId
+          );
+
+
+          // -------------------------------
+          // عضویت
+          // -------------------------------
 
           const isMember =
             await checkUserMembership(
@@ -361,9 +364,9 @@ export default {
           }
 
 
-          // --------------------------------
+          // -------------------------------
           // ساخت بازی
-          // --------------------------------
+          // -------------------------------
 
           const gameState =
             generateNewGame();
@@ -391,9 +394,9 @@ export default {
           );
 
 
-          // --------------------------------
-          // ساخت SVG
-          // --------------------------------
+          // -------------------------------
+          // SVG
+          // -------------------------------
 
           const svg =
             renderSudokuSVG(
@@ -410,15 +413,22 @@ export default {
             );
 
 
-          // --------------------------------
-          // ارسال جدول
-          // --------------------------------
+          // -------------------------------
+          // ارسال
+          // -------------------------------
 
-          await sendSudokuPhoto(
-            BOT_TOKEN,
-            chatId,
-            svg,
-            keyboard
+          const result =
+            await sendSudokuPhoto(
+              BOT_TOKEN,
+              chatId,
+              svg,
+              keyboard
+            );
+
+
+          console.log(
+            'SEND PHOTO RESULT:',
+            JSON.stringify(result)
           );
 
 
@@ -442,12 +452,25 @@ export default {
           inlineQuery.id;
 
 
+        console.log(
+          'INLINE QUERY RECEIVED:',
+          queryId
+        );
+
+
         const gameState =
           generateNewGame();
 
 
+        // توجه:
+        // فعلاً با queryId نگه می‌داریم.
+        // بعد از ارسال Inline، callback
+        // session را با inline_message_id
+        // پیدا خواهیم کرد.
+
+
         const sessionKey =
-          `inline_${queryId}`;
+          `inline_query_${queryId}`;
 
 
         activeGames.set(
@@ -478,7 +501,9 @@ export default {
 
         const results = [
           {
-            type: 'article',
+
+            type:
+              'article',
 
             id:
               `sudoku_${Date.now()}`,
@@ -487,13 +512,13 @@ export default {
               '🧩 شروع بازی گروهی سودوکو',
 
             description:
-              'ارسال جدول سودوکو به گروه',
+              'ارسال بازی سودوکو',
 
             input_message_content: {
 
               message_text:
-                '🧩 بازی گروهی سودوکو\n\n' +
-                'برای شروع روی خانه مورد نظر بزنید.',
+                '🧩 **بازی گروهی سودوکو**\n\n' +
+                'روی یکی از خانه‌های جدول بزنید.',
 
               parse_mode:
                 'Markdown'
@@ -505,29 +530,42 @@ export default {
         ];
 
 
-        await fetch(
-          `https://api.telegram.org/bot${BOT_TOKEN}/answerInlineQuery`,
-          {
-            method: 'POST',
+        const inlineResponse =
+          await fetch(
+            `https://api.telegram.org/bot${BOT_TOKEN}/answerInlineQuery`,
+            {
+              method: 'POST',
 
-            headers: {
-              'Content-Type':
-                'application/json'
-            },
+              headers: {
+                'Content-Type':
+                  'application/json'
+              },
 
-            body: JSON.stringify({
-              inline_query_id:
-                queryId,
+              body: JSON.stringify({
 
-              results,
+                inline_query_id:
+                  queryId,
 
-              cache_time:
-                0,
+                results,
 
-              is_personal:
-                true
-            })
-          }
+                cache_time:
+                  0,
+
+                is_personal:
+                  true
+
+              })
+            }
+          );
+
+
+        const inlineData =
+          await inlineResponse.json();
+
+
+        console.log(
+          'INLINE ANSWER RESULT:',
+          JSON.stringify(inlineData)
         );
 
 
@@ -539,23 +577,37 @@ export default {
       // Callback Query
       // ====================================
 
-      if (
-        update.callback_query
-        console.log
-  'CALLBACK RECEIVED:',
-  JSON.stringify
-    id: update.callback_query.id,
-    data: update.callback_query.data,
-    inline_message_id: update.callback_query.inline_message_id,
-    message: update.callback_query.message
-      ? {
-          chat_id: update.callback_query.message.chat.id,
-          message_id: update.callback_query.message.message_id
-        }
-      : null
-  })
-);
-      ) {
+      if (update.callback_query) {
+
+        // ----------------------------------
+        // لاگ بسیار مهم
+        // ----------------------------------
+
+        console.log(
+          'CALLBACK RECEIVED:',
+          JSON.stringify({
+            id:
+              update.callback_query.id,
+
+            data:
+              update.callback_query.data,
+
+            inline_message_id:
+              update.callback_query.inline_message_id,
+
+            message:
+              update.callback_query.message
+                ? {
+                    chat_id:
+                      update.callback_query.message.chat.id,
+
+                    message_id:
+                      update.callback_query.message.message_id
+                  }
+                : null
+          })
+        );
+
 
         const cq =
           update.callback_query;
@@ -571,12 +623,18 @@ export default {
           'کاربر';
 
 
-        // --------------------------------
+        // ----------------------------------
         // Session
-        // --------------------------------
+        // ----------------------------------
 
         const sessionKey =
           getSessionKey(cq);
+
+
+        console.log(
+          'SESSION KEY:',
+          sessionKey
+        );
 
 
         if (!sessionKey) {
@@ -591,9 +649,9 @@ export default {
         }
 
 
-        // --------------------------------
-        // بررسی عضویت
-        // --------------------------------
+        // ----------------------------------
+        // عضویت
+        // ----------------------------------
 
         const isMember =
           await checkUserMembership(
@@ -607,30 +665,38 @@ export default {
           await answerCallback(
             BOT_TOKEN,
             cq.id,
-            '⚠️ ابتدا در کانال‌های موردنیاز عضو شوید.'
+            '⚠️ ابتدا عضو کانال‌های موردنیاز شوید.'
           );
 
           return new Response('OK');
         }
 
 
-        // --------------------------------
-        // ساخت بازی اگر وجود نداشت
-        // --------------------------------
+        // ----------------------------------
+        // اگر بازی وجود نداشت
+        // ----------------------------------
 
         if (
           !activeGames.has(sessionKey)
         ) {
+
+          console.log(
+            'GAME NOT FOUND. CREATING NEW GAME:',
+            sessionKey
+          );
+
 
           activeGames.set(
             sessionKey,
             generateNewGame()
           );
 
+
           selectedCellsMap.set(
             sessionKey,
             null
           );
+
 
           userScoresMap.set(
             sessionKey,
@@ -644,12 +710,15 @@ export default {
 
 
         let selectedCell =
-          selectedCellsMap.get(sessionKey) ||
-          null;
+          selectedCellsMap.get(
+            sessionKey
+          ) || null;
 
 
         let scores =
-          userScoresMap.get(sessionKey);
+          userScoresMap.get(
+            sessionKey
+          );
 
 
         if (!scores) {
@@ -674,6 +743,12 @@ export default {
 
         const data =
           cq.data;
+
+
+        console.log(
+          'CALLBACK DATA:',
+          data
+        );
 
 
         // ==================================
@@ -729,11 +804,18 @@ export default {
             sessionKey,
             scores
           );
+
+
+          await answerCallback(
+            BOT_TOKEN,
+            cq.id,
+            '🔄 بازی جدید ساخته شد.'
+          );
         }
 
 
         // ==================================
-        // حالت مداد
+        // مداد
         // ==================================
 
         else if (
@@ -742,6 +824,15 @@ export default {
 
           gameState.pencilMode =
             !gameState.pencilMode;
+
+
+          await answerCallback(
+            BOT_TOKEN,
+            cq.id,
+            gameState.pencilMode
+              ? '✏️ حالت مداد روشن شد.'
+              : '✏️ حالت مداد خاموش شد.'
+          );
         }
 
 
@@ -760,6 +851,12 @@ export default {
           selectedCellsMap.set(
             sessionKey,
             null
+          );
+
+
+          await answerCallback(
+            BOT_TOKEN,
+            cq.id
           );
         }
 
@@ -782,6 +879,15 @@ export default {
 
           const c =
             Number(parts[2]);
+
+
+          console.log(
+            'CELL CLICK:',
+            {
+              r,
+              c
+            }
+          );
 
 
           if (
@@ -807,23 +913,32 @@ export default {
 
             await answerCallback(
               BOT_TOKEN,
-              cq.id
+              cq.id,
+              `📍 خانه ${r + 1}،${c + 1} انتخاب شد.`
+            );
+
+          } else {
+
+            await answerCallback(
+              BOT_TOKEN,
+              cq.id,
+              '❌ خانه نامعتبر است.'
             );
           }
 
 
-          // --------------------------------
-          // رندر مجدد
-          // --------------------------------
+          // -------------------------------
+          // رندر جدید
+          // -------------------------------
 
-          const updatedSvg =
+          const selectedSvg =
             renderSudokuSVG(
               gameState,
               selectedCell
             );
 
 
-          const updatedKeyboard =
+          const selectedKeyboard =
             buildControlKeyboard(
               gameState,
               selectedCell,
@@ -835,23 +950,37 @@ export default {
             cq.message
           ) {
 
-            await updateSudokuPhoto(
-              BOT_TOKEN,
-              cq.message.chat.id,
-              cq.message.message_id,
-              updatedSvg,
-              updatedKeyboard
+            const editResult =
+              await updateSudokuPhoto(
+                BOT_TOKEN,
+                cq.message.chat.id,
+                cq.message.message_id,
+                selectedSvg,
+                selectedKeyboard
+              );
+
+
+            console.log(
+              'EDIT MESSAGE RESULT:',
+              JSON.stringify(editResult)
             );
 
           } else if (
             cq.inline_message_id
           ) {
 
-            await updateInlineSudokuPhoto(
-              BOT_TOKEN,
-              cq.inline_message_id,
-              updatedSvg,
-              updatedKeyboard
+            const editResult =
+              await updateInlineSudokuPhoto(
+                BOT_TOKEN,
+                cq.inline_message_id,
+                selectedSvg,
+                selectedKeyboard
+              );
+
+
+            console.log(
+              'EDIT INLINE RESULT:',
+              JSON.stringify(editResult)
             );
           }
 
@@ -865,13 +994,24 @@ export default {
         // ==================================
 
         else if (
-          data.startsWith('input_') &&
-          selectedCell
+          data.startsWith('input_')
         ) {
 
-          // --------------------------------
-          // محدودیت خطا
-          // --------------------------------
+          if (!selectedCell) {
+
+            await answerCallback(
+              BOT_TOKEN,
+              cq.id,
+              '👇 ابتدا یک خانه انتخاب کنید.'
+            );
+
+            return new Response('OK');
+          }
+
+
+          // -------------------------------
+          // حداکثر سه خطا
+          // -------------------------------
 
           if (
             userStats.mistakes >= 3
@@ -880,7 +1020,7 @@ export default {
             await answerCallback(
               BOT_TOKEN,
               cq.id,
-              '❌ شما ۳ خطا کرده‌اید و دیگر نمی‌توانید حرکت کنید.'
+              '❌ شما ۳ خطا کرده‌اید.'
             );
 
             return new Response('OK');
@@ -905,9 +1045,9 @@ export default {
             gameState.board[r][c];
 
 
-          // --------------------------------
+          // -------------------------------
           // خانه داده اولیه
-          // --------------------------------
+          // -------------------------------
 
           if (
             cell.given
@@ -916,16 +1056,16 @@ export default {
             await answerCallback(
               BOT_TOKEN,
               cq.id,
-              '🔒 این عدد اولیه جدول است.'
+              '🔒 این خانه قابل تغییر نیست.'
             );
 
             return new Response('OK');
           }
 
 
-          // --------------------------------
-          // حالت مداد
-          // --------------------------------
+          // -------------------------------
+          // مداد
+          // -------------------------------
 
           if (
             gameState.pencilMode
@@ -961,12 +1101,18 @@ export default {
                 cell.notes.push(val);
               }
             }
+
+
+            await answerCallback(
+              BOT_TOKEN,
+              cq.id
+            );
           }
 
 
-          // --------------------------------
-          // ورود عدد معمولی
-          // --------------------------------
+          // -------------------------------
+          // ورود عدد واقعی
+          // -------------------------------
 
           else {
 
@@ -980,11 +1126,17 @@ export default {
               cell.isError =
                 false;
 
+              await answerCallback(
+                BOT_TOKEN,
+                cq.id,
+                '🧹 خانه پاک شد.'
+              );
+
             } else {
 
-              // ----------------------------
-              // بررسی Sudoku
-              // ----------------------------
+              // ---------------------------
+              // ساخت برد موقت
+              // ---------------------------
 
               const tempBoard =
                 gameState.board.map(
@@ -996,199 +1148,13 @@ export default {
                 );
 
 
-              // خانه فعلی را خالی می‌کنیم
-              // تا خودش در بررسی تکراری
-              // محسوب نشود.
-
+              // خانه فعلی حذف شود
               tempBoard[r][c] =
                 null;
 
 
-              const validByRules =
-                isValid(
-                  tempBoard,
-                  r,
-                  c,
-                  val
-                );
+              // ---------------------------
+              // بررسی قوانین Sudoku
+              // ---------------------------
 
-
-              const correctSolution =
-                val ===
-                cell.solutionValue;
-
-
-              // ----------------------------
-              // حرکت اشتباه
-              // ----------------------------
-
-              if (
-                !validByRules ||
-                !correctSolution
-              ) {
-
-                cell.value =
-                  val;
-
-                cell.isError =
-                  true;
-
-
-                userStats.mistakes++;
-
-
-                userStats.score =
-                  Math.max(
-                    0,
-                    userStats.score - 5
-                  );
-
-
-                gameState.mistakes =
-                  (gameState.mistakes || 0) + 1;
-
-
-                await answerCallback(
-                  BOT_TOKEN,
-                  cq.id,
-                  '❌ عدد اشتباه است.'
-                );
-
-              }
-
-
-              // ----------------------------
-              // حرکت صحیح
-              // ----------------------------
-
-              else {
-
-                cell.value =
-                  val;
-
-                cell.isError =
-                  false;
-
-                cell.notes =
-                  [];
-
-
-                userStats.score +=
-                  10;
-
-
-                await answerCallback(
-                  BOT_TOKEN,
-                  cq.id,
-                  '✅ درست!'
-                );
-              }
-            }
-          }
-
-
-          // --------------------------------
-          // بررسی تکمیل جدول
-          // --------------------------------
-
-          checkGameCompletion(
-            gameState
-          );
-        }
-
-
-        // ==================================
-        // Callback ناشناخته
-        // ==================================
-
-        else {
-
-          await answerCallback(
-            BOT_TOKEN,
-            cq.id,
-            '❓ دستور ناشناخته است.'
-          );
-
-          return new Response('OK');
-        }
-
-
-        // ==================================
-        // رندر نهایی
-        // ==================================
-
-        const svg =
-          renderSudokuSVG(
-            gameState,
-            selectedCell
-          );
-
-
-        const keyboard =
-          buildControlKeyboard(
-            gameState,
-            selectedCell,
-            scores
-          );
-
-
-        // ==================================
-        // پیام معمولی
-        // ==================================
-
-        if (
-          cq.message
-        ) {
-
-          await updateSudokuPhoto(
-            BOT_TOKEN,
-            cq.message.chat.id,
-            cq.message.message_id,
-            svg,
-            keyboard
-          );
-        }
-
-
-        // ==================================
-        // پیام Inline
-        // ==================================
-
-        else if (
-          cq.inline_message_id
-        ) {
-
-          await updateInlineSudokuPhoto(
-            BOT_TOKEN,
-            cq.inline_message_id,
-            svg,
-            keyboard
-          );
-        }
-
-
-        return new Response('OK');
-      }
-
-
-      return new Response('OK');
-
-
-    } catch (error) {
-
-      console.error(
-        'MAIN ERROR:',
-        error
-      );
-
-
-      return new Response(
-        error?.message ||
-          'Internal Server Error',
-        {
-          status: 500
-        }
-      );
-    }
-  }
-};
+      
