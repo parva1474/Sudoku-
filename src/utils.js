@@ -1,7 +1,15 @@
-export function buildControlKeyboard(gameState, selectedCell) {
+export function buildControlKeyboard(gameState, selectedCell, scoresMap = null) {
   let keyboard = [];
 
-  // اگر خانه‌ای انتخاب شده باشد، کیبورد اعداد و مداد نمایش داده می‌شود
+  // نمایش لیست امتیازات بازیکنان گروه در بالای دکمه‌ها
+  if (scoresMap && scoresMap.size > 0) {
+    let scoreText = "🏆 جدول امتیازات گروه:\n";
+    for (let [uid, stats] of scoresMap.entries()) {
+      scoreText += `👤 ${stats.name}: امتیاز ${stats.score} | خطا: ${stats.mistakes}/3\n`;
+    }
+    keyboard.push([{ text: scoreText.trim(), callback_data: "noop" }]);
+  }
+
   if (selectedCell && gameState.status === 'PLAYING') {
     keyboard.push([
       { text: gameState.pencilMode ? "✏️ حالت مداد: روشن" : "✏️ حالت مداد: خاموش", callback_data: "toggle_pencil" }
@@ -27,11 +35,11 @@ export function buildControlKeyboard(gameState, selectedCell) {
     ]);
   } else {
     keyboard.push([
-      { text: "👇 لطفاً یک خانه را از جدول زیر انتخاب کنید", callback_data: "noop" }
+      { text: "👇 ابتدا یک خانه را از گرید زیر انتخاب کنید", callback_data: "noop" }
     ]);
   }
 
-  // گرید کلیدهای انتخاب خانه‌ها (۸۱ خانه برای تعامل مستقیم)
+  // گرید انتخاب خانه‌ها (برای اینکه کاربران مستقیماً خانه مورد نظر را انتخاب کنند)
   let gridSelect = [];
   for (let r = 0; r < 9; r++) {
     let row = [];
@@ -49,7 +57,7 @@ export function buildControlKeyboard(gameState, selectedCell) {
 
   keyboard.push([
     { text: "🔄 بازی جدید", callback_data: "new_game" },
-    { text: `خطاها: ${gameState.mistakes}/${gameState.maxMistakes}`, callback_data: "noop" }
+    { text: `وضعیت: ${gameState.status}`, callback_data: "noop" }
   ]);
 
   return { inline_keyboard: keyboard };
