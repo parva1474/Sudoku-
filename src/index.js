@@ -1,234 +1,1130 @@
-import { generateNewGame, isValid } from './sudoku.js';
+بریم سراغ مرحله ۴ — index.js. این مهم‌ترین مرحله است، چون مشکل کلیک خانه‌ها و مدیریت بازی Inline/گروه همین‌جا حل می‌شود.
+کل index.js فعلی را پاک کن و این نسخه را جایگزین کن:
+نوشتن
+// ==========================================
+// index.js
+// کنترل اصلی ربات سودوکو
+// ==========================================
+
+import {
+  generateNewGame,
+  isValid,
+  isGameComplete
+} from './sudoku.js';
+
 import { renderSudokuSVG } from './sudokuRenderer.js';
-import { sendSudokuPhoto, updateSudokuPhoto, answerCallback } from './telegram.js';
+
+import {
+  sendSudokuPhoto,
+  updateSudokuPhoto,
+  updateInlineSudokuPhoto,
+  answerCallback
+} from './telegram.js';
+
 import { buildControlKeyboard } from './utils.js';
 
+
+// ==========================================
+// تنظیمات
+// ==========================================
+
+// ⚠️ بهتر است بعداً این توکن را داخل Secret کلادفلر قرار بدهی.
 const BOT_TOKEN = '8604292634:AAHBsJ9HXgISutUw6S0qTRcOWi08nn38ZuY';
-const REQUIRED_CHANNELS = ['@nwechannell', '@parvapoem'];
 
-// ذخیره‌سازی وضعیت بازی و امتیازات کاربران به صورت تفکیک‌شده برای هر گروه/چت
+const REQUIRED_CHANNELS = [
+  '@nwechannell',
+  '@parvapoem'
+];
+
+
+// ==========================================
+// حافظه بازی‌ها
+// ==========================================
+
 const activeGames = new Map();
-const selectedCellsMap = new Map();
-const userScoresMap = new Map(); // ذخیره امتیازات و خطاهای هر کاربر در هر بازی: { userId: { score: 100, mistakes: 0 } }
 
-async function checkUserMembership(userId, token) {
+const selectedCellsMap = new Map();
+
+const userScoresMap = new Map();
+
+
+// ==========================================
+// بررسی عضویت کاربر
+// ==========================================
+
+async function checkUserMembership(userId) {
+
   for (const channel of REQUIRED_CHANNELS) {
+
     try {
-      const res = await fetch(`https://api.telegram.org/bot${token}/getChatMember?chat_id=${channel}&user_id=${userId}`);
-      const data = await res.json();
-      if (!data.ok || ['left', 'kicked', 'restricted'].includes(data.result.status)) {
+
+      const response = await fetch(
+        `https://api.telegram.org/bot${BOT_TOKEN}/getChatMember` +
+        `?chat_id=${channel}&user_id=${userId}`
+      );
+
+      const data = await response.json();
+
+      if (
+        !data.ok ||
+        ['left', 'kicked', 'restricted'].includes(
+          data.result.status
+        )
+      ) {
         return false;
       }
-    } catch (e) {
+
+    } catch (error) {
+
+      console.error(
+        'Membership check error:',
+        error
+      );
+
       return false;
     }
   }
+
   return true;
 }
 
-export default {
-  async fetch(request, env, ctx) {
-    if (request.method !== 'POST') {
-      return new Response('Sudoku Bot is running!');
+
+// ==========================================
+// ساخت شناسه یکتا برای بازی Inline
+// ==========================================
+
+function createGameId() {
+
+  return (
+    Date.now().toString(36) +
+    '_' +
+    Math.random()
+      .toString(36)
+      .substring(2, 8)
+  );
+}
+
+
+// ==========================================
+// استخراج session از callback
+// ==========================================
+
+function getSessionFromCallback(cq) {
+
+  // پیام معمولی گروه / خصوصی
+  if (cq.message) {
+
+    return {
+      type: 'chat',
+      sessionKey: `chat_${cq.message.chat.id}`,
+      chatId: cq.message.chat.id,
+      messageId: cq.message.message_id,
+      inlineMessageId: null
+    };
+  }
+
+  // پیام Inline
+  if (cq.inline_message_id) {
+
+    return {
+      type: 'inline',
+      sessionKey: `inline_${cq.inline_message_id}`,
+      chatId: null,
+      messageId: null,
+      inlineMessageId: cq.inline_message_id
+    };
+  }
+
+  return null;
+}
+
+
+// ==========================================
+// ساخت بازی جدید
+// ==========================================
+
+function createGameSession(sessionKey) {
+
+  const gameState = generateNewGame();
+
+  activeGames.set(
+    sessionKey,
+    gameState
+  );
+
+  selectedCellsMap.set(
+    sessionKey,
+    null
+  );
+
+  userScoresMap.set(
+    sessionKey,
+    new Map()
+  );
+
+  return gameState;
+}
+
+
+// ==========================================
+// دریافت اطلاعات بازیکن
+// ==========================================
+
+function getUserStats(
+  scores,
+  userId,
+  userName
+) {
+
+  if (!scores.has(userId)) {
+
+    scores.set(
+      userId,
+      {
+        name: userName,
+        score: 100,
+        mistakes: 0
+      }
+    );
+  }
+
+  return scores.get(userId);
+}
+
+
+// ==========================================
+// پردازش انتخاب خانه
+// ==========================================
+
+function selectCell(
+  sessionKey,
+  gameState,
+  row,
+  col
+) {
+
+  if (
+    !Number.isInteger(row) ||
+    !Number.isInteger(col) ||
+    row < 0 ||
+    row > 8 ||
+    col < 0 ||
+    col > 8
+  ) {
+    return null;
+  }
+
+  const cell = gameState.board[row][col];
+
+  const selectedCell = {
+    r: row,
+    c: col
+  };
+
+  selectedCellsMap.set(
+    sessionKey,
+    selectedCell
+  );
+
+  return selectedCell;
+}
+
+
+// ==========================================
+// پردازش ورود عدد
+// ==========================================
+
+function processNumberInput(
+  gameState,
+  selectedCell,
+  userStats,
+  value
+) {
+
+  if (!selectedCell) {
+
+    return {
+      ok: false,
+      message: '👇 ابتدا یک خانه را انتخاب کنید.'
+    };
+  }
+
+
+  const {
+    r,
+    c
+  } = selectedCell;
+
+
+  const cell = gameState.board[r][c];
+
+
+  // ========================================
+  // خانه ثابت
+  // ========================================
+
+  if (cell.given) {
+
+    return {
+      ok: false,
+      message: '🔒 این خانه از ابتدا پر شده و قابل تغییر نیست.'
+    };
+  }
+
+
+  // ========================================
+  // محدودیت خطا
+  // ========================================
+
+  if (userStats.mistakes >= 3) {
+
+    return {
+      ok: false,
+      message:
+        '❌ شما ۳ خطا داشته‌اید و دیگر نمی‌توانید حرکت انجام دهید.'
+    };
+  }
+
+
+  // ========================================
+  // پاک کردن
+  // ========================================
+
+  if (value === 0) {
+
+    cell.value = null;
+    cell.isError = false;
+
+    return {
+      ok: true
+    };
+  }
+
+
+  // ========================================
+  // حالت مداد
+  // ========================================
+
+  if (gameState.pencilMode) {
+
+    if (cell.notes.includes(value)) {
+
+      cell.notes =
+        cell.notes.filter(
+          n => n !== value
+        );
+
+    } else {
+
+      // فقط عددهای 1 تا 9
+      if (value >= 1 && value <= 9) {
+
+        cell.notes.push(value);
+
+        cell.notes.sort(
+          (a, b) => a - b
+        );
+      }
     }
 
+    return {
+      ok: true
+    };
+  }
+
+
+  // ========================================
+  // حالت عادی
+  // ========================================
+
+  const boardValues =
+    gameState.board.map(
+      row =>
+        row.map(
+          currentCell =>
+            currentCell.value ?? 0
+        )
+    );
+
+
+  // خانه فعلی را موقتاً خالی می‌کنیم
+  boardValues[r][c] = 0;
+
+
+  // ========================================
+  // بررسی قوانین سودوکو
+  // ========================================
+
+  const validByRules =
+    isValid(
+      boardValues,
+      r,
+      c,
+      value
+    );
+
+
+  // ========================================
+  // عدد اشتباه
+  // ========================================
+
+  if (
+    !validByRules ||
+    value !== cell.solutionValue
+  ) {
+
+    cell.value = value;
+    cell.isError = true;
+
+    userStats.mistakes++;
+
+    userStats.score =
+      Math.max(
+        0,
+        userStats.score - 5
+      );
+
+    gameState.mistakes++;
+
+    return {
+      ok: true,
+      error: true,
+      message:
+        !validByRules
+          ? '❌ این عدد با قوانین سودوکو سازگار نیست.'
+          : '❌ عدد واردشده جواب این خانه نیست.'
+    };
+  }
+
+
+  // ========================================
+  // عدد صحیح
+  // ========================================
+
+  cell.value = value;
+
+  cell.notes = [];
+
+  cell.isError = false;
+
+  userStats.score += 10;
+
+
+  // ========================================
+  // بررسی تکمیل بازی
+  // ========================================
+
+  if (
+    isGameComplete(gameState)
+  ) {
+
+    gameState.status =
+      'COMPLETED';
+
+    return {
+      ok: true,
+      completed: true,
+      message:
+        '🎉 تبریک! سودوکو را کامل حل کردید!'
+    };
+  }
+
+
+  return {
+    ok: true
+  };
+}
+
+
+// ==========================================
+// Handler اصلی
+// ==========================================
+
+export default {
+
+  async fetch(
+    request,
+    env,
+    ctx
+  ) {
+
+    // ========================================
+    // فقط POST
+    // ========================================
+
+    if (request.method !== 'POST') {
+
+      return new Response(
+        'Sudoku Bot is running!'
+      );
+    }
+
+
     try {
-      const update = await request.json();
 
-      if (update.message && update.message.text === '/start') {
-        const chatId = update.message.chat.id;
-        const userId = update.message.from.id;
+      const update =
+        await request.json();
 
-        // بررسی عضویت اجباری در کانال‌ها
-        const isMember = await checkUserMembership(userId, BOT_TOKEN);
+
+      // ======================================
+      // /start
+      // ======================================
+
+      if (
+        update.message &&
+        update.message.text === '/start'
+      ) {
+
+        const chatId =
+          update.message.chat.id;
+
+        const userId =
+          update.message.from.id;
+
+
+        // بررسی عضویت
+        const isMember =
+          await checkUserMembership(
+            userId
+          );
+
+
         if (!isMember) {
-          await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: chatId,
-              text: "⚠️ برای بازی سودوکو باید ابتدا در کانال‌های زیر عضو شوید:\n1️⃣ @nwechannell\n2️⃣ @parvapoem\n\nسپس دوباره دستور /start را ارسال کنید."
-            })
-          });
+
+          await fetch(
+            `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+            {
+              method: 'POST',
+
+              headers: {
+                'Content-Type':
+                  'application/json'
+              },
+
+              body: JSON.stringify({
+                chat_id: chatId,
+
+                text:
+                  '⚠️ برای بازی سودوکو باید ابتدا در کانال‌های زیر عضو شوید:\n\n' +
+                  '1️⃣ @nwechannell\n' +
+                  '2️⃣ @parvapoem\n\n' +
+                  'سپس دوباره /start را ارسال کنید.'
+              })
+            }
+          );
+
           return new Response('OK');
         }
 
-        const gameState = generateNewGame();
-        const sessionKey = `chat_${chatId}`;
-        
-        activeGames.set(sessionKey, gameState);
-        selectedCellsMap.set(sessionKey, null);
-        userScoresMap.set(sessionKey, new Map()); // ریست امتیازات گروه
 
-        const svg = renderSudokuSVG(gameState, null);
-        const keyboard = buildControlKeyboard(gameState, null);
+        // ساخت بازی
+        const sessionKey =
+          `chat_${chatId}`;
 
-        await sendSudokuPhoto(BOT_TOKEN, chatId, svg, keyboard);
-      } 
-      else if (update.inline_query) {
-        const inlineQuery = update.inline_query;
-        const queryId = inlineQuery.id;
-        const gameState = generateNewGame();
-        const sessionKey = `inline_${queryId}`;
-        
-        activeGames.set(sessionKey, gameState);
-        selectedCellsMap.set(sessionKey, null);
-        userScoresMap.set(sessionKey, new Map());
+        const gameState =
+          createGameSession(
+            sessionKey
+          );
 
-        const svg = renderSudokuSVG(gameState, null);
-        
+
+        const svg =
+          renderSudokuSVG(
+            gameState,
+            null
+          );
+
+
+        const keyboard =
+          buildControlKeyboard(
+            gameState,
+            null,
+            null
+          );
+
+
+        await sendSudokuPhoto(
+          BOT_TOKEN,
+          chatId,
+          svg,
+          keyboard
+        );
+
+
+        return new Response('OK');
+      }
+
+
+      // ======================================
+      // Inline Query
+      // ======================================
+
+      if (update.inline_query) {
+
+        const inlineQuery =
+          update.inline_query;
+
+        const queryId =
+          inlineQuery.id;
+
+
+        /*
+         * بازی واقعی هنوز پیام نشده،
+         * بنابراین session بعداً با inline_message_id
+         * ساخته/شناسایی می‌شود.
+         */
+
         const results = [
+
           {
             type: 'article',
-            id: 'sudoku_' + Date.now(),
-            title: '🧩 شروع بازی گروهی سودوکو',
-            description: 'ارسال جدول سودوکو به گروه (چندنفره با ثبت امتیاز مجزا)',
+
+            id:
+              'sudoku_' +
+              Date.now(),
+
+            title:
+              '🧩 شروع بازی گروهی سودوکو',
+
+            description:
+              'سودوکوی ۹×۹ چندنفره',
+
             input_message_content: {
-              message_text: "🧩 **بازی گروهی سودوکو**\n\nهر کاربر می‌تواند خانه انتخاب کند و امتیازش ثبت شود. (حداکثر ۳ خطا مجاز برای هر نفر)",
-              parse_mode: 'Markdown'
+
+              message_text:
+                '🧩 بازی سودوکو\n\n' +
+                'برای شروع، جدول را از دکمه‌های زیر بازی کنید.',
+
+              parse_mode:
+                'Markdown'
             },
-            reply_markup: buildControlKeyboard(gameState, null)
+
+            reply_markup: {
+
+              inline_keyboard: [
+
+                [
+                  {
+                    text:
+                      '🎮 ساخت بازی سودوکو',
+
+                    callback_data:
+                      `inline_start_${queryId}`
+                  }
+                ]
+
+              ]
+            }
           }
+
         ];
 
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerInlineQuery`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            inline_query_id: queryId,
-            results: results,
-            cache_time: 0
-          })
-        });
-      } 
-      else if (update.callback_query) {
-        const cq = update.callback_query;
-        const userId = cq.from.id;
-        const userName = cq.from.first_name || 'کاربر';
-        const chatId = cq.message ? cq.message.chat.id : null;
-        const messageId = cq.message ? cq.message.message_id : null;
-        const sessionKey = chatId ? `chat_${chatId}` : `inline_${cq.inline_message_id}`;
 
-        // بررسی عضویت اجباری برای کلیک روی دکمه‌ها
-        const isMember = await checkUserMembership(userId, BOT_TOKEN);
-        if (!isMember) {
-          await answerCallback(BOT_TOKEN, cq.id, "⚠️ ابتدا باید در کانال‌های @nwechannell و @parvapoem عضو شوید!");
-          return new Response('OK');
-        }
+        await fetch(
+          `https://api.telegram.org/bot${BOT_TOKEN}/answerInlineQuery`,
+          {
+            method: 'POST',
 
-        if (!activeGames.has(sessionKey)) {
-          activeGames.set(sessionKey, generateNewGame());
-          userScoresMap.set(sessionKey, new Map());
-        }
+            headers: {
+              'Content-Type':
+                'application/json'
+            },
 
-        let gameState = activeGames.get(sessionKey);
-        let selectedCell = selectedCellsMap.get(sessionKey) || null;
-        let scores = userScoresMap.get(sessionKey);
+            body: JSON.stringify({
 
-        if (!scores.has(userId)) {
-          scores.set(userId, { name: userName, score: 100, mistakes: 0 });
-        }
-        let userStats = scores.get(userId);
+              inline_query_id:
+                queryId,
 
-        const data = cq.data;
+              results,
 
-        if (data === 'noop') {
-          await answerCallback(BOT_TOKEN, cq.id);
-          return new Response('OK');
-        }
+              cache_time: 0,
 
-        if (data === 'new_game') {
-          gameState = generateNewGame();
-          activeGames.set(sessionKey, gameState);
-          selectedCell = null;
-          selectedCellsMap.set(sessionKey, null);
-          userScoresMap.set(sessionKey, new Map());
-        } else if (data === 'toggle_pencil') {
-          gameState.pencilMode = !gameState.pencilMode;
-        } else if (data === 'deselect') {
-          selectedCell = null;
-          selectedCellsMap.set(sessionKey, null);
-        } else if (data.startsWith('cell_')) {
-          const [, r, c] = data.split('_');
-          selectedCell = { r: parseInt(r), c: parseInt(c) };
-          selectedCellsMap.set(sessionKey, selectedCell);
-        } else if (data.startsWith('input_') && selectedCell) {
-          // بررسی محدودیت خطای کاربر (حداکثر ۳ خطا، خطای چهارم اخراج از ثبت حرکت)
-          if (userStats.mistakes >= 3) {
-            await answerCallback(BOT_TOKEN, cq.id, "❌ شما ۳ خطای خود را مصرف کرده‌اید و دیگر نمی‌توانید حرکتی انجام دهید!");
+              is_personal: true
+            })
+          }
+        );
+
+
+        return new Response('OK');
+      }
+
+
+      // ======================================
+      // Callback Query
+      // ======================================
+
+      if (update.callback_query) {
+
+        const cq =
+          update.callback_query;
+
+        const userId =
+          cq.from.id;
+
+        const userName =
+          cq.from.first_name ||
+          'کاربر';
+
+        const data =
+          cq.data || '';
+
+
+        // ====================================
+        // callback مربوط به شروع Inline
+        // ====================================
+
+        if (
+          data.startsWith(
+            'inline_start_'
+          )
+        ) {
+
+          /*
+           * این callback فقط برای پیام Inline است.
+           *
+           * وقتی کاربر روی دکمه کلیک کرد،
+           * inline_message_id در اختیار ماست.
+           */
+
+          if (!cq.inline_message_id) {
+
+            await answerCallback(
+              BOT_TOKEN,
+              cq.id,
+              '❌ خطا: شناسه پیام Inline پیدا نشد.'
+            );
+
             return new Response('OK');
           }
 
-          const val = parseInt(data.split('_')[1]);
-          const { r, c } = selectedCell;
-          let cell = gameState.board[r][c];
 
-          if (!cell.given) {
-            if (gameState.pencilMode) {
-              if (val === 0) {
-                cell.notes = [];
-              } else {
-                if (cell.notes.includes(val)) {
-                  cell.notes = cell.notes.filter(n => n !== val);
-                } else {
-                  cell.notes.push(val);
-                }
-              }
-            } else {
-              if (val === 0) {
-                cell.value = null;
-                cell.isError = false;
-              } else {
-                cell.value = val;
-                cell.notes = [];
+          const sessionKey =
+            `inline_${cq.inline_message_id}`;
 
-                let tempVals = gameState.board.map(row => row.map(cell => cell.value));
-                tempVals[r][c] = null;
-                let isValidLocal = isValid(tempVals, r, c, val);
 
-                // بررسی صحت حرکت (اگر اشتباه باشد یا با solution نخواند)
-                if (!isValidLocal || val !== cell.solutionValue) {
-                  cell.isError = true;
-                  userStats.mistakes++;
-                  userStats.score = Math.max(0, userStats.score - 5); // کسر ۵ امتیاز به ازای هر خطا
-                  gameState.mistakes++;
-                } else {
-                  cell.isError = false;
-                  userStats.score += 10; // پاداش حرکت درست
-                }
-              }
-            }
+          const gameState =
+            createGameSession(
+              sessionKey
+            );
 
-            // بررسی وضعیت اتمام بازی
-            let isComplete = true;
-            let isAllCorrect = true;
-            for (let row = 0; row < 9; row++) {
-              for (let col = 0; col < 9; col++) {
-                let cl = gameState.board[row][col];
-                if (cl.value === null) isComplete = false;
-                if (cl.value !== cl.solutionValue) isAllCorrect = false;
-              }
-            }
-            if (isComplete && isAllCorrect) {
-              gameState.status = 'COMPLETED';
-            }
+
+          const selectedCell =
+            null;
+
+
+          const scores =
+            userScoresMap.get(
+              sessionKey
+            );
+
+
+          const svg =
+            renderSudokuSVG(
+              gameState,
+              selectedCell
+            );
+
+
+          const keyboard =
+            buildControlKeyboard(
+              gameState,
+              selectedCell,
+              scores
+            );
+
+
+          await updateInlineSudokuPhoto(
+            BOT_TOKEN,
+
+            cq.inline_message_id,
+
+            svg,
+
+            keyboard
+          );
+
+
+          await answerCallback(
+            BOT_TOKEN,
+            cq.id
+          );
+
+
+          return new Response('OK');
+        }
+
+
+        // ====================================
+        // شناسایی بازی
+        // ====================================
+
+        const session =
+          getSessionFromCallback(cq);
+
+
+        if (!session) {
+
+          await answerCallback(
+            BOT_TOKEN,
+            cq.id,
+            '❌ بازی پیدا نشد.'
+          );
+
+          return new Response('OK');
+        }
+
+
+        const {
+          sessionKey,
+          type,
+          chatId,
+          messageId,
+          inlineMessageId
+        } = session;
+
+
+        // ====================================
+        // عضویت اجباری
+        // ====================================
+
+        const isMember =
+          await checkUserMembership(
+            userId
+          );
+
+
+        if (!isMember) {
+
+          await answerCallback(
+            BOT_TOKEN,
+            cq.id,
+
+            '⚠️ ابتدا در کانال‌های @nwechannell و @parvapoem عضو شوید!'
+          );
+
+          return new Response('OK');
+        }
+
+
+        // ====================================
+        // اگر بازی وجود نداشت
+        // ====================================
+
+        if (
+          !activeGames.has(
+            sessionKey
+          )
+        ) {
+
+          createGameSession(
+            sessionKey
+          );
+        }
+
+
+        const gameState =
+          activeGames.get(
+            sessionKey
+          );
+
+
+        let selectedCell =
+          selectedCellsMap.get(
+            sessionKey
+          ) || null;
+
+
+        const scores =
+          userScoresMap.get(
+            sessionKey
+          );
+
+
+        const userStats =
+          getUserStats(
+            scores,
+            userId,
+            userName
+          );
+
+
+        // ====================================
+        // noop
+        // ====================================
+
+        if (
+          data === 'noop'
+        ) {
+
+          await answerCallback(
+            BOT_TOKEN,
+            cq.id
+          );
+
+          return new Response('OK');
+        }
+
+
+        // ====================================
+        // بازی جدید
+        // ====================================
+
+        if (
+          data === 'new_game'
+        ) {
+
+          const newGame =
+            generateNewGame();
+
+
+          activeGames.set(
+            sessionKey,
+            newGame
+          );
+
+
+          selectedCellsMap.set(
+            sessionKey,
+            null
+          );
+
+
+          userScoresMap.set(
+            sessionKey,
+            new Map()
+          );
+
+
+          await answerCallback(
+            BOT_TOKEN,
+            cq.id,
+            '🔄 بازی جدید ساخته شد.'
+          );
+
+
+          const newSvg =
+            renderSudokuSVG(
+              newGame,
+              null
+            );
+
+
+          const newScores =
+            userScoresMap.get(
+              sessionKey
+            );
+
+
+          const newKeyboard =
+            buildControlKeyboard(
+              newGame,
+              null,
+              newScores
+            );
+
+
+          if (
+            type === 'chat'
+          ) {
+
+            await updateSudokuPhoto(
+              BOT_TOKEN,
+              chatId,
+              messageId,
+              newSvg,
+              newKeyboard
+            );
+
+          } else {
+
+            await updateInlineSudokuPhoto(
+              BOT_TOKEN,
+              inlineMessageId,
+              newSvg,
+              newKeyboard
+            );
           }
+
+
+          return new Response('OK');
         }
 
-        await answerCallback(BOT_TOKEN, cq.id);
 
-        const svg = renderSudokuSVG(gameState, selectedCell);
-        const keyboard = buildControlKeyboard(gameState, selectedCell, scores);
+        // ====================================
+        // انتخاب خانه
+        // ====================================
 
-        if (chatId && messageId) {
-          await updateSudokuPhoto(BOT_TOKEN, chatId, messageId, svg, keyboard);
+        if (
+          data.startsWith('cell_')
+        ) {
+
+          const parts =
+            data.split('_');
+
+
+          const row =
+            Number(parts[1]);
+
+          const col =
+            Number(parts[2]);
+
+
+          if (
+            !Number.isInteger(row) ||
+            !Number.isInteger(col) ||
+            row < 0 ||
+            row > 8 ||
+            col < 0 ||
+            col > 8
+          ) {
+
+            await answerCallback(
+              BOT_TOKEN,
+              cq.id,
+              '❌ خانه نامعتبر است.'
+            );
+
+            return new Response('OK');
+          }
+
+
+          selectedCell =
+            selectCell(
+              sessionKey,
+              gameState,
+              row,
+              col
+            );
+
+
+          await answerCallback(
+            BOT_TOKEN,
+            cq.id
+          );
+
+
+          const selectedSvg =
+            renderSudokuSVG(
+              gameState,
+              selectedCell
+            );
+
+
+          const selectedKeyboard =
+            buildControlKeyboard(
+              gameState,
+              selectedCell,
+              scores
+            );
+
+
+          if (
+            type === 'chat'
+          ) {
+
+            await updateSudokuPhoto(
+              BOT_TOKEN,
+              chatId,
+              messageId,
+              selectedSvg,
+              selectedKeyboard
+            );
+
+          } else {
+
+            await updateInlineSudokuPhoto(
+              BOT_TOKEN,
+              inlineMessageId,
+              selectedSvg,
+              selectedKeyboard
+            );
+          }
+
+
+          return new Response('OK');
         }
-      }
 
-      return new Response('OK');
-    } catch (e) {
-      console.error(e);
-      return new Response(e.message, { status: 500 });
-    }
-  }
-};
+
+        // ====================================
+        // لغو انتخاب
+        // ====================================
+
+        if (
+          data === 'deselect'
+        ) {
+
+          selectedCell =
+            null;
+
+          selectedCellsMap.set(
+            sessionKey,
+            null
+          );
+
+
+          await answerCallback(
+            BOT_TOKEN,
+            cq.id
+          );
+
+
+          const deselectedSvg =
+            renderSudokuSVG(
+              gameState,
+              null
+            );
+
+
+          const deselectedKeyboard =
+            buildControlKeyboard(
+              gameState,
+              null,
+              scores
+            );
+
+
+          if (
+            type === 'chat'
+          ) {
+
+            await updateSudokuPhoto(
+              BOT_TOKEN,
+              chatId,
+              messageId,
+              deselectedSvg,
+              deselectedKeyboard
+            );
+
+          } else {
+
+            await updateInlineSudokuPhoto(
+              BOT_TOKEN,
+              inlineMessageId,
+              deselectedSvg,
+              deselectedKeyboard
+            );
+          }
+
+
+          return new Response('OK');
+        }
+
+
+        // ====================================
+        // تغییر حالت مداد
+        // ====================================
+
+        if (
+          data === 'toggle_pencil'
+        ) {
+
+          gameState.pencilMode =
+            !gameState.pencilMode;
+
+
+          await answerCallback(
+            BOT_TOKEN,
+            cq.id,
+
+            gameState.pencilMode
+              ? '✏️ حالت مداد روشن شد.'
+              : '✏️ حالت مداد خام
