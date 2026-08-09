@@ -1,5 +1,5 @@
 // ==========================================
-// src/index.js
+// src/index.js - قسمت اول
 // Sudoku Telegram Bot
 // Cloudflare Workers
 // ==========================================
@@ -37,7 +37,7 @@ const REQUIRED_CHANNELS = [
 
 
 // ==========================================
-// حافظه موقت
+// حافظه موقت بازی‌ها
 // ==========================================
 
 const activeGames = new Map();
@@ -48,7 +48,7 @@ const userScoresMap = new Map();
 
 
 // ==========================================
-// بررسی عضویت
+// بررسی عضویت کاربر
 // ==========================================
 
 async function checkUserMembership(
@@ -121,7 +121,7 @@ async function checkUserMembership(
 
 
 // ==========================================
-// Session Key
+// ساخت Session Key
 // ==========================================
 
 function getSessionKey(cq) {
@@ -149,7 +149,7 @@ function getSessionKey(cq) {
 
 
 // ==========================================
-// امتیاز کاربر
+// ساخت امتیاز اولیه کاربر
 // ==========================================
 
 function ensureUserScore(
@@ -253,7 +253,7 @@ export default {
   ) {
 
     // --------------------------------------
-    // توکن
+    // توکن ربات
     // --------------------------------------
 
     const BOT_TOKEN =
@@ -276,7 +276,7 @@ export default {
 
 
     // --------------------------------------
-    // GET
+    // درخواست غیر POST
     // --------------------------------------
 
     if (
@@ -336,9 +336,9 @@ export default {
           );
 
 
-          // -------------------------------
-          // عضویت
-          // -------------------------------
+          // --------------------------------
+          // بررسی عضویت
+          // --------------------------------
 
           const isMember =
             await checkUserMembership(
@@ -364,9 +364,9 @@ export default {
           }
 
 
-          // -------------------------------
-          // ساخت بازی
-          // -------------------------------
+          // --------------------------------
+          // ساخت بازی جدید
+          // --------------------------------
 
           const gameState =
             generateNewGame();
@@ -394,9 +394,9 @@ export default {
           );
 
 
-          // -------------------------------
-          // SVG
-          // -------------------------------
+          // --------------------------------
+          // ساخت تصویر
+          // --------------------------------
 
           const svg =
             renderSudokuSVG(
@@ -409,13 +409,15 @@ export default {
             buildControlKeyboard(
               gameState,
               null,
-              userScoresMap.get(sessionKey)
+              userScoresMap.get(
+                sessionKey
+              )
             );
 
 
-          // -------------------------------
-          // ارسال
-          // -------------------------------
+          // --------------------------------
+          // ارسال جدول
+          // --------------------------------
 
           const result =
             await sendSudokuPhoto(
@@ -458,15 +460,12 @@ export default {
         );
 
 
+        // --------------------------------
+        // ساخت بازی
+        // --------------------------------
+
         const gameState =
           generateNewGame();
-
-
-        // توجه:
-        // فعلاً با queryId نگه می‌داریم.
-        // بعد از ارسال Inline، callback
-        // session را با inline_message_id
-        // پیدا خواهیم کرد.
 
 
         const sessionKey =
@@ -491,13 +490,23 @@ export default {
         );
 
 
+        // --------------------------------
+        // کیبورد
+        // --------------------------------
+
         const keyboard =
           buildControlKeyboard(
             gameState,
             null,
-            userScoresMap.get(sessionKey)
+            userScoresMap.get(
+              sessionKey
+            )
           );
 
+
+        // --------------------------------
+        // نتیجه Inline
+        // --------------------------------
 
         const results = [
           {
@@ -529,6 +538,10 @@ export default {
           }
         ];
 
+
+        // --------------------------------
+        // پاسخ به Inline Query
+        // --------------------------------
 
         const inlineResponse =
           await fetch(
@@ -580,7 +593,7 @@ export default {
       if (update.callback_query) {
 
         // ----------------------------------
-        // لاگ بسیار مهم
+        // لاگ دریافت Callback
         // ----------------------------------
 
         console.log(
@@ -650,7 +663,7 @@ export default {
 
 
         // ----------------------------------
-        // عضویت
+        // بررسی عضویت
         // ----------------------------------
 
         const isMember =
@@ -673,7 +686,7 @@ export default {
 
 
         // ----------------------------------
-        // اگر بازی وجود نداشت
+        // اگر بازی پیدا نشد
         // ----------------------------------
 
         if (
@@ -681,7 +694,7 @@ export default {
         ) {
 
           console.log(
-            'GAME NOT FOUND. CREATING NEW GAME:',
+            'GAME NOT FOUND:',
             sessionKey
           );
 
@@ -705,8 +718,14 @@ export default {
         }
 
 
+        // ----------------------------------
+        // دریافت وضعیت بازی
+        // ----------------------------------
+
         const gameState =
-          activeGames.get(sessionKey);
+          activeGames.get(
+            sessionKey
+          );
 
 
         let selectedCell =
@@ -815,7 +834,7 @@ export default {
 
 
         // ==================================
-        // مداد
+        // حالت مداد
         // ==================================
 
         else if (
@@ -927,9 +946,9 @@ export default {
           }
 
 
-          // -------------------------------
-          // رندر جدید
-          // -------------------------------
+          // --------------------------------
+          // رندر بعد از انتخاب خانه
+          // --------------------------------
 
           const selectedSvg =
             renderSudokuSVG(
@@ -945,6 +964,10 @@ export default {
               scores
             );
 
+
+          // --------------------------------
+          // پیام معمولی
+          // --------------------------------
 
           if (
             cq.message
@@ -964,8 +987,14 @@ export default {
               'EDIT MESSAGE RESULT:',
               JSON.stringify(editResult)
             );
+          }
 
-          } else if (
+
+          // --------------------------------
+          // پیام Inline
+          // --------------------------------
+
+          else if (
             cq.inline_message_id
           ) {
 
@@ -989,7 +1018,8 @@ export default {
         }
 
 
-        // ==================================
+
+    // ==================================
         // ورود عدد
         // ==================================
 
@@ -997,12 +1027,16 @@ export default {
           data.startsWith('input_')
         ) {
 
+          // -------------------------------
+          // آیا خانه‌ای انتخاب شده؟
+          // -------------------------------
+
           if (!selectedCell) {
 
             await answerCallback(
               BOT_TOKEN,
               cq.id,
-              '👇 ابتدا یک خانه انتخاب کنید.'
+              '👇 ابتدا یک خانه از جدول انتخاب کنید.'
             );
 
             return new Response('OK');
@@ -1010,7 +1044,7 @@ export default {
 
 
           // -------------------------------
-          // حداکثر سه خطا
+          // حداکثر ۳ خطا
           // -------------------------------
 
           if (
@@ -1020,7 +1054,7 @@ export default {
             await answerCallback(
               BOT_TOKEN,
               cq.id,
-              '❌ شما ۳ خطا کرده‌اید.'
+              '❌ شما ۳ خطای مجاز خود را مصرف کرده‌اید.'
             );
 
             return new Response('OK');
@@ -1046,7 +1080,7 @@ export default {
 
 
           // -------------------------------
-          // خانه داده اولیه
+          // خانه اولیه جدول
           // -------------------------------
 
           if (
@@ -1056,21 +1090,30 @@ export default {
             await answerCallback(
               BOT_TOKEN,
               cq.id,
-              '🔒 این خانه قابل تغییر نیست.'
+              '🔒 این خانه از ابتدا پر شده و قابل تغییر نیست.'
             );
 
             return new Response('OK');
           }
 
 
-          // -------------------------------
-          // مداد
-          // -------------------------------
+          // =================================
+          // حالت مداد
+          // =================================
 
           if (
             gameState.pencilMode
           ) {
 
+            if (
+              !Array.isArray(cell.notes)
+            ) {
+
+              cell.notes = [];
+            }
+
+
+            // پاک کردن یادداشت‌ها
             if (
               val === 0
             ) {
@@ -1079,14 +1122,7 @@ export default {
 
             } else {
 
-              if (
-                !Array.isArray(cell.notes)
-              ) {
-
-                cell.notes = [];
-              }
-
-
+              // حذف یادداشت موجود
               if (
                 cell.notes.includes(val)
               ) {
@@ -1096,7 +1132,10 @@ export default {
                     n => n !== val
                   );
 
-              } else {
+              }
+
+              // اضافه کردن یادداشت
+              else {
 
                 cell.notes.push(val);
               }
@@ -1105,16 +1144,21 @@ export default {
 
             await answerCallback(
               BOT_TOKEN,
-              cq.id
+              cq.id,
+              '✏️ یادداشت به‌روزرسانی شد.'
             );
           }
 
 
-          // -------------------------------
-          // ورود عدد واقعی
-          // -------------------------------
+          // =================================
+          // حالت ورود عدد
+          // =================================
 
           else {
+
+            // -----------------------------
+            // پاک کردن خانه
+            // -----------------------------
 
             if (
               val === 0
@@ -1126,16 +1170,23 @@ export default {
               cell.isError =
                 false;
 
+
               await answerCallback(
                 BOT_TOKEN,
                 cq.id,
                 '🧹 خانه پاک شد.'
               );
+            }
 
-            } else {
+
+            // -----------------------------
+            // وارد کردن عدد
+            // -----------------------------
+
+            else {
 
               // ---------------------------
-              // ساخت برد موقت
+              // ساخت کپی وضعیت فعلی جدول
               // ---------------------------
 
               const tempBoard =
@@ -1148,13 +1199,232 @@ export default {
                 );
 
 
-              // خانه فعلی حذف شود
+              // خانه فعلی را موقتاً خالی می‌کنیم
               tempBoard[r][c] =
                 null;
 
 
               // ---------------------------
-              // بررسی قوانین Sudoku
+              // بررسی قانون سودوکو
               // ---------------------------
 
-      
+              const validByRules =
+                isValid(
+                  tempBoard,
+                  r,
+                  c,
+                  val
+                );
+
+
+              // ---------------------------
+              // بررسی جواب واقعی
+              // ---------------------------
+
+              const isCorrect =
+                val ===
+                cell.solutionValue;
+
+
+              // ---------------------------
+              // عدد اشتباه
+              // ---------------------------
+
+              if (
+                !validByRules ||
+                !isCorrect
+              ) {
+
+                cell.value =
+                  val;
+
+                cell.isError =
+                  true;
+
+
+                userStats.mistakes++;
+
+
+                userStats.score =
+                  Math.max(
+                    0,
+                    userStats.score - 5
+                  );
+
+
+                gameState.mistakes =
+                  (gameState.mistakes || 0) + 1;
+
+
+                await answerCallback(
+                  BOT_TOKEN,
+                  cq.id,
+                  '❌ عدد اشتباه است. ۵ امتیاز کم شد.'
+                );
+              }
+
+
+              // ---------------------------
+              // عدد صحیح
+              // ---------------------------
+
+              else {
+
+                cell.value =
+                  val;
+
+                cell.isError =
+                  false;
+
+                cell.notes =
+                  [];
+
+
+                userStats.score +=
+                  10;
+
+
+                await answerCallback(
+                  BOT_TOKEN,
+                  cq.id,
+                  '✅ درست! ۱۰ امتیاز گرفتی.'
+                );
+              }
+            }
+          }
+        }
+
+
+        // ==================================
+        // Callback ناشناخته
+        // ==================================
+
+        else {
+
+          console.log(
+            'UNKNOWN CALLBACK:',
+            data
+          );
+
+
+          await answerCallback(
+            BOT_TOKEN,
+            cq.id,
+            '❓ دستور ناشناخته است.'
+          );
+
+
+          return new Response('OK');
+        }
+
+
+        // ==================================
+        // بررسی کامل شدن جدول
+        // ==================================
+
+        checkGameCompletion(
+          gameState
+        );
+
+
+        // ==================================
+        // ساخت تصویر جدید
+        // ==================================
+
+        const finalSvg =
+          renderSudokuSVG(
+            gameState,
+            selectedCell
+          );
+
+
+        // ==================================
+        // ساخت کیبورد جدید
+        // ==================================
+
+        const finalKeyboard =
+          buildControlKeyboard(
+            gameState,
+            selectedCell,
+            scores
+          );
+
+
+        // ==================================
+        // ویرایش پیام معمولی
+        // ==================================
+
+        if (
+          cq.message
+        ) {
+
+          const result =
+            await updateSudokuPhoto(
+              BOT_TOKEN,
+              cq.message.chat.id,
+              cq.message.message_id,
+              finalSvg,
+              finalKeyboard
+            );
+
+
+          console.log(
+            'FINAL EDIT RESULT:',
+            JSON.stringify(result)
+          );
+        }
+
+
+        // ==================================
+        // ویرایش پیام Inline
+        // ==================================
+
+        else if (
+          cq.inline_message_id
+        ) {
+
+          const result =
+            await updateInlineSudokuPhoto(
+              BOT_TOKEN,
+              cq.inline_message_id,
+              finalSvg,
+              finalKeyboard
+            );
+
+
+          console.log(
+            'FINAL INLINE RESULT:',
+            JSON.stringify(result)
+          );
+        }
+
+
+        return new Response('OK');
+      }
+
+
+      // ====================================
+      // هیچ آپدیت شناخته‌شده‌ای نیست
+      // ====================================
+
+      return new Response('OK');
+
+
+    } catch (error) {
+
+      console.error(
+        'MAIN ERROR:',
+        error
+      );
+
+
+      return new Response(
+        error?.message ||
+          'Internal Server Error',
+        {
+          status: 500
+        }
+      );
+    }
+  }
+};
