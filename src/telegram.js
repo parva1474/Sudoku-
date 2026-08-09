@@ -1,50 +1,171 @@
-export async function sendSudokuPhoto(token, chatId, svgString, replyMarkup) {
-  // تبدیل SVG به فرمت قابل ارسال (می‌توان به عنوان فایل باینری ارسال کرد)
-  const formData = new FormData();
-  formData.append('chat_id', chatId);
-  
-  const blob = new Blob([svgString], { type: 'image/svg+xml' });
-  formData.append('photo', blob, 'sudoku.svg');
-  formData.append('caption', '🧩 جدول سودوکو کلاسیک\nخانه مورد نظر را انتخاب کرده و عدد خود را وارد کنید.');
-  if (replyMarkup) {
-    formData.append('reply_markup', JSON.stringify(replyMarkup));
+// ==========================================
+// telegram.js
+// توابع ارتباط با Telegram Bot API
+// ==========================================
+
+/**
+ * ارسال درخواست به Telegram API
+ */
+async function telegramRequest(token, method, body) {
+  const response = await fetch(
+    `https://api.telegram.org/bot${token}/${method}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    }
+  );
+
+  const data = await response.json();
+
+  if (!data.ok) {
+    console.error(
+      `Telegram API Error (${method}):`,
+      data
+    );
   }
 
-  const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-    method: 'POST',
-    body: formData
-  });
-  return await res.json();
+  return data;
 }
 
-export async function updateSudokuPhoto(token, chatId, messageId, svgString, replyMarkup) {
-  const formData = new FormData();
-  formData.append('chat_id', chatId);
-  formData.append('message_id', messageId);
 
-  const blob = new Blob([svgString], { type: 'image/svg+xml' });
-  formData.append('media', JSON.stringify({
-    type: 'photo',
-    media: 'attach://sudoku',
-    caption: '🧩 جدول سودوکو کلاسیک'
-  }));
-  formData.append('sudoku', blob, 'sudoku.svg');
+/**
+ * ارسال عکس سودوکو
+ *
+ * svg باید به صورت string باشد.
+ */
+export async function sendSudokuPhoto(
+  token,
+  chatId,
+  svg,
+  keyboard
+) {
+  const base64 = btoa(
+    unescape(
+      encodeURIComponent(svg)
+    )
+  );
 
-  if (replyMarkup) {
-    formData.append('reply_markup', JSON.stringify(replyMarkup));
+  return await telegramRequest(
+    token,
+    "sendPhoto",
+    {
+      chat_id: chatId,
+
+      photo: `data:image/svg+xml;base64,${base64}`,
+
+      caption: "🧩 بازی سودوکو",
+
+      reply_markup: keyboard
+    }
+  );
+}
+
+
+/**
+ * آپدیت عکس سودوکو در پیام معمولی
+ *
+ * برای پیام‌هایی که chat_id و message_id دارند.
+ */
+export async function updateSudokuPhoto(
+  token,
+  chatId,
+  messageId,
+  svg,
+  keyboard
+) {
+  const base64 = btoa(
+    unescape(
+      encodeURIComponent(svg)
+    )
+  );
+
+  return await telegramRequest(
+    token,
+    "editMessageMedia",
+    {
+      chat_id: chatId,
+
+      message_id: messageId,
+
+      media: {
+        type: "photo",
+
+        media:
+          `data:image/svg+xml;base64,${base64}`,
+
+        caption: "🧩 بازی سودوکو"
+      },
+
+      reply_markup: keyboard
+    }
+  );
+}
+
+
+/**
+ * آپدیت پیام Inline
+ *
+ * این تابع برای زمانی است که بازی
+ * از طریق Inline Mode ارسال شده باشد.
+ */
+export async function updateInlineSudokuPhoto(
+  token,
+  inlineMessageId,
+  svg,
+  keyboard
+) {
+  const base64 = btoa(
+    unescape(
+      encodeURIComponent(svg)
+    )
+  );
+
+  return await telegramRequest(
+    token,
+    "editMessageMedia",
+    {
+      inline_message_id: inlineMessageId,
+
+      media: {
+        type: "photo",
+
+        media:
+          `data:image/svg+xml;base64,${base64}`,
+
+        caption: "🧩 بازی سودوکو"
+      },
+
+      reply_markup: keyboard
+    }
+  );
+}
+
+
+/**
+ * پاسخ به callback query
+ *
+ * باعث می‌شود لودینگ روی دکمه تلگرام
+ * متوقف شود.
+ */
+export async function answerCallback(
+  token,
+  callbackQueryId,
+  text = null
+) {
+  const body = {
+    callback_query_id: callbackQueryId
+  };
+
+  if (text) {
+    body.text = text;
   }
 
-  const res = await fetch(`https://api.telegram.org/bot${token}/editMessageMedia`, {
-    method: 'POST',
-    body: formData
-  });
-  return await res.json();
-}
-
-export async function answerCallback(token, callbackQueryId, text = '') {
-  await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ callback_query_id: callbackQueryId, text: text })
-  });
+  return await telegramRequest(
+    token,
+    "answerCallbackQuery",
+    body
+  );
 }
