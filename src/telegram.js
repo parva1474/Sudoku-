@@ -1,7 +1,14 @@
 // ==========================================
 // telegram.js
-// ارتباط با Telegram Bot API
-// سازگار با Cloudflare Workers
+// Telegram API + SVG -> PNG
+// مخصوص Cloudflare Workers
+// ==========================================
+
+import { Resvg } from "@cf-wasm/resvg/workerd";
+
+
+// ==========================================
+// درخواست به Telegram API
 // ==========================================
 
 async function telegramRequest(token, method, body) {
@@ -9,10 +16,7 @@ async function telegramRequest(token, method, body) {
     `https://api.telegram.org/bot${token}/${method}`,
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(body)
+      body
     }
   );
 
@@ -30,148 +34,240 @@ async function telegramRequest(token, method, body) {
 
 
 // ==========================================
-// ارسال پیام متنی
+// تبدیل SVG به PNG
 // ==========================================
 
-export async function sendMessage(
-  token,
-  chatId,
-  text,
-  replyMarkup = null
-) {
-  const body = {
-    chat_id: chatId,
-    text
-  };
+async function svgToPng(svg) {
+  const resvg = new Resvg(svg, {
+    fitTo: {
+      mode: "original"
+    }
+  });
 
-  if (replyMarkup) {
-    body.reply_markup = replyMarkup;
+  const pngData = resvg.render();
+
+  return pngData.asPng();
+}
+
+
+// ==========================================
+// ساخت FormData برای Telegram
+// ==========================================
+
+function createPhotoForm(
+  chatId,
+  pngBytes,
+  keyboard
+) {
+  const form = new FormData();
+
+  form.append(
+    "chat_id",
+    String(chatId)
+  );
+
+  form.append(
+    "photo",
+    new Blob(
+      [pngBytes],
+      {
+        type: "image/png"
+      }
+    ),
+    "sudoku.png"
+  );
+
+  form.append(
+    "caption",
+    "🧩 بازی سودوکو"
+  );
+
+  if (keyboard) {
+    form.append(
+      "reply_markup",
+      JSON.stringify(keyboard)
+    );
   }
 
-  return telegramRequest(
-    token,
-    "sendMessage",
-    body
-  );
+  return form;
 }
 
 
 // ==========================================
-// تبدیل SVG به Blob
-//
-// فعلاً برای استفاده‌های بعدی نگه داشته شده.
-// ==========================================
-
-function svgToBlob(svg) {
-  return new Blob(
-    [svg],
-    {
-      type: "image/svg+xml"
-    }
-  );
-}
-
-
-// ==========================================
-// ارسال تصویر سودوکو
-//
-// توجه:
-// Telegram برای sendPhoto فایل تصویر واقعی
-// می‌خواهد. SVG خام را مستقیماً photo نمی‌کنیم.
-//
-// این تابع فعلاً از URL داده‌شده استفاده می‌کند.
-// رندر نهایی تصویر را در مرحله بعد حل می‌کنیم.
+// ارسال عکس سودوکو
 // ==========================================
 
 export async function sendSudokuPhoto(
   token,
   chatId,
-  photoUrl,
+  svg,
   keyboard
 ) {
-  return telegramRequest(
-    token,
-    "sendPhoto",
-    {
-      chat_id: chatId,
+  try {
 
-      photo: photoUrl,
+    const pngBytes =
+      await svgToPng(svg);
 
-      caption:
-        "🧩 بازی سودوکو",
-
-      reply_markup:
+    const form =
+      createPhotoForm(
+        chatId,
+        pngBytes,
         keyboard
-    }
-  );
+      );
+
+    return await telegramRequest(
+      token,
+      "sendPhoto",
+      form
+    );
+
+  } catch (error) {
+
+    console.error(
+      "SVG -> PNG error:",
+      error
+    );
+
+    throw error;
+  }
 }
 
 
 // ==========================================
-// ویرایش تصویر پیام معمولی
+// ویرایش عکس پیام معمولی
 // ==========================================
 
 export async function updateSudokuPhoto(
   token,
   chatId,
   messageId,
-  photoUrl,
+  svg,
   keyboard
 ) {
-  return telegramRequest(
-    token,
-    "editMessageMedia",
-    {
-      chat_id: chatId,
+  try {
 
-      message_id: messageId,
+    const pngBytes =
+      await svgToPng(svg);
 
-      media: {
+    const form =
+      new FormData();
+
+    form.append(
+      "chat_id",
+      String(chatId)
+    );
+
+    form.append(
+      "message_id",
+      String(messageId)
+    );
+
+    form.append(
+      "media",
+      JSON.stringify({
         type: "photo",
+        media: "attach://sudoku",
+        caption: "🧩 بازی سودوکو"
+      })
+    );
 
-        media: photoUrl,
+    form.append(
+      "sudoku",
+      new Blob(
+        [pngBytes],
+        {
+          type: "image/png"
+        }
+      ),
+      "sudoku.png"
+    );
 
-        caption:
-          "🧩 بازی سودوکو"
-      },
+    form.append(
+      "reply_markup",
+      JSON.stringify(keyboard)
+    );
 
-      reply_markup:
-        keyboard
-    }
-  );
+    return await telegramRequest(
+      token,
+      "editMessageMedia",
+      form
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Update Sudoku photo error:",
+      error
+    );
+
+    throw error;
+  }
 }
 
 
 // ==========================================
-// ویرایش تصویر Inline
+// ویرایش عکس Inline
 // ==========================================
 
 export async function updateInlineSudokuPhoto(
   token,
   inlineMessageId,
-  photoUrl,
+  svg,
   keyboard
 ) {
-  return telegramRequest(
-    token,
-    "editMessageMedia",
-    {
-      inline_message_id:
-        inlineMessageId,
+  try {
 
-      media: {
+    const pngBytes =
+      await svgToPng(svg);
+
+    const form =
+      new FormData();
+
+    form.append(
+      "inline_message_id",
+      String(inlineMessageId)
+    );
+
+    form.append(
+      "media",
+      JSON.stringify({
         type: "photo",
+        media: "attach://sudoku",
+        caption: "🧩 بازی سودوکو"
+      })
+    );
 
-        media: photoUrl,
+    form.append(
+      "sudoku",
+      new Blob(
+        [pngBytes],
+        {
+          type: "image/png"
+        }
+      ),
+      "sudoku.png"
+    );
 
-        caption:
-          "🧩 بازی سودوکو"
-      },
+    form.append(
+      "reply_markup",
+      JSON.stringify(keyboard)
+    );
 
-      reply_markup:
-        keyboard
-    }
-  );
+    return await telegramRequest(
+      token,
+      "editMessageMedia",
+      form
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Update Inline Sudoku photo error:",
+      error
+    );
+
+    throw error;
+  }
 }
 
 
@@ -184,18 +280,62 @@ export async function answerCallback(
   callbackQueryId,
   text = null
 ) {
-  const body = {
-    callback_query_id:
-      callbackQueryId
-  };
+  const form =
+    new URLSearchParams();
+
+  form.append(
+    "callback_query_id",
+    String(callbackQueryId)
+  );
 
   if (text) {
-    body.text = text;
+    form.append(
+      "text",
+      text
+    );
   }
 
-  return telegramRequest(
+  return await telegramRequest(
     token,
     "answerCallbackQuery",
-    body
+    form
+  );
+}
+
+
+// ==========================================
+// ارسال پیام متنی
+// ==========================================
+
+export async function sendMessage(
+  token,
+  chatId,
+  text,
+  keyboard = null
+) {
+  const form =
+    new URLSearchParams();
+
+  form.append(
+    "chat_id",
+    String(chatId)
+  );
+
+  form.append(
+    "text",
+    text
+  );
+
+  if (keyboard) {
+    form.append(
+      "reply_markup",
+      JSON.stringify(keyboard)
+    );
+  }
+
+  return await telegramRequest(
+    token,
+    "sendMessage",
+    form
   );
 }
