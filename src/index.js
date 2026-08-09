@@ -1276,13 +1276,10 @@ export default {
           '❓ دستور ناشناخته است.'
         );
 
-
         return new Response('OK');
       }
 
-
       return new Response('OK');
-
 
     } catch (error) {
 
@@ -1290,7 +1287,6 @@ export default {
         'MAIN ERROR:',
         error
       );
-
 
       return new Response(
         error?.message ||
@@ -1301,3 +1297,4 @@ export default {
       );
     }
   }
+};
