@@ -1,0 +1,10 @@
+{
+  "name": "telegram-sudoku-bot",
+  "version": "1.0.0",
+  "description": "Telegram multiplayer Sudoku bot on Cloudflare Workers",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "sharp": "^0.34.3"
+  }
+}
