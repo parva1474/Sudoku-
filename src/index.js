@@ -1,6 +1,3 @@
-بریم سراغ مرحله ۴ — index.js. این مهم‌ترین مرحله است، چون مشکل کلیک خانه‌ها و مدیریت بازی Inline/گروه همین‌جا حل می‌شود.
-کل index.js فعلی را پاک کن و این نسخه را جایگزین کن:
-نوشتن
 // ==========================================
 // index.js
 // کنترل اصلی ربات سودوکو
@@ -29,7 +26,7 @@ import { buildControlKeyboard } from './utils.js';
 // ==========================================
 
 // ⚠️ بهتر است بعداً این توکن را داخل Secret کلادفلر قرار بدهی.
-const BOT_TOKEN = '8604292634:AAHBsJ9HXgISutUw6S0qTRcOWi08nn38ZuY';
+const BOT_TOKEN = 'توکن_ربات_خودت_را_اینجا_قرار_بده';
 
 const REQUIRED_CHANNELS = [
   '@nwechannell',
@@ -1127,4 +1124,180 @@ export default {
 
             gameState.pencilMode
               ? '✏️ حالت مداد روشن شد.'
-              : '✏️ حالت مداد خام
+              : '✏️ حالت مداد خاموش شد.'
+          );
+
+
+          const pencilSvg =
+            renderSudokuSVG(
+              gameState,
+              selectedCell
+            );
+
+
+          const pencilKeyboard =
+            buildControlKeyboard(
+              gameState,
+              selectedCell,
+              scores
+            );
+
+
+          if (
+            type === 'chat'
+          ) {
+
+            await updateSudokuPhoto(
+              BOT_TOKEN,
+              chatId,
+              messageId,
+              pencilSvg,
+              pencilKeyboard
+            );
+
+          } else {
+
+            await updateInlineSudokuPhoto(
+              BOT_TOKEN,
+              inlineMessageId,
+              pencilSvg,
+              pencilKeyboard
+            );
+          }
+
+
+          return new Response('OK');
+        }
+
+
+        // ====================================
+        // ورود عدد
+        // ====================================
+
+        if (
+          data.startsWith('input_')
+        ) {
+
+          const value =
+            Number(
+              data.split('_')[1]
+            );
+
+
+          const result =
+            processNumberInput(
+              gameState,
+              selectedCell,
+              userStats,
+              value
+            );
+
+
+          if (!result.ok) {
+
+            await answerCallback(
+              BOT_TOKEN,
+              cq.id,
+              result.message ||
+                '❌ این حرکت امکان‌پذیر نیست.'
+            );
+
+            return new Response('OK');
+          }
+
+
+          // پاسخ به callback
+          await answerCallback(
+            BOT_TOKEN,
+            cq.id,
+            result.message || null
+          );
+
+
+          // اگر بازی تمام شد
+          if (
+            result.completed
+          ) {
+
+            gameState.status =
+              'COMPLETED';
+          }
+
+
+          const inputSvg =
+            renderSudokuSVG(
+              gameState,
+              selectedCell
+            );
+
+
+          const inputKeyboard =
+            buildControlKeyboard(
+              gameState,
+              selectedCell,
+              scores
+            );
+
+
+          if (
+            type === 'chat'
+          ) {
+
+            await updateSudokuPhoto(
+              BOT_TOKEN,
+              chatId,
+              messageId,
+              inputSvg,
+              inputKeyboard
+            );
+
+          } else {
+
+            await updateInlineSudokuPhoto(
+              BOT_TOKEN,
+              inlineMessageId,
+              inputSvg,
+              inputKeyboard
+            );
+          }
+
+
+          return new Response('OK');
+        }
+
+
+        // ====================================
+        // callback ناشناخته
+        // ====================================
+
+        await answerCallback(
+          BOT_TOKEN,
+          cq.id,
+          '❓ دستور ناشناخته است.'
+        );
+
+
+        return new Response('OK');
+      }
+
+
+      return new Response('OK');
+
+
+    } catch (error) {
+
+      console.error(
+        'MAIN ERROR:',
+        error
+      );
+
+
+      return new Response(
+        error?.message ||
+          'Internal Server Error',
+        {
+          status: 500
+        }
+      );
+    }
+  }
