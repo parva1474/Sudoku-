@@ -1,11 +1,9 @@
 // ==========================================
 // telegram.js
-// توابع ارتباط با Telegram Bot API
+// ارتباط با Telegram Bot API
+// سازگار با Cloudflare Workers
 // ==========================================
 
-/**
- * ارسال درخواست به Telegram API
- */
 async function telegramRequest(token, method, body) {
   const response = await fetch(
     `https://api.telegram.org/bot${token}/${method}`,
@@ -22,8 +20,8 @@ async function telegramRequest(token, method, body) {
 
   if (!data.ok) {
     console.error(
-      `Telegram API Error (${method}):`,
-      data
+      `Telegram API Error [${method}]:`,
+      JSON.stringify(data)
     );
   }
 
@@ -31,58 +29,96 @@ async function telegramRequest(token, method, body) {
 }
 
 
-/**
- * ارسال عکس سودوکو
- *
- * svg باید به صورت string باشد.
- */
-export async function sendSudokuPhoto(
+// ==========================================
+// ارسال پیام متنی
+// ==========================================
+
+export async function sendMessage(
   token,
   chatId,
-  svg,
-  keyboard
+  text,
+  replyMarkup = null
 ) {
-  const base64 = btoa(
-    unescape(
-      encodeURIComponent(svg)
-    )
-  );
+  const body = {
+    chat_id: chatId,
+    text
+  };
 
-  return await telegramRequest(
+  if (replyMarkup) {
+    body.reply_markup = replyMarkup;
+  }
+
+  return telegramRequest(
     token,
-    "sendPhoto",
+    "sendMessage",
+    body
+  );
+}
+
+
+// ==========================================
+// تبدیل SVG به Blob
+//
+// فعلاً برای استفاده‌های بعدی نگه داشته شده.
+// ==========================================
+
+function svgToBlob(svg) {
+  return new Blob(
+    [svg],
     {
-      chat_id: chatId,
-
-      photo: `data:image/svg+xml;base64,${base64}`,
-
-      caption: "🧩 بازی سودوکو",
-
-      reply_markup: keyboard
+      type: "image/svg+xml"
     }
   );
 }
 
 
-/**
- * آپدیت عکس سودوکو در پیام معمولی
- *
- * برای پیام‌هایی که chat_id و message_id دارند.
- */
+// ==========================================
+// ارسال تصویر سودوکو
+//
+// توجه:
+// Telegram برای sendPhoto فایل تصویر واقعی
+// می‌خواهد. SVG خام را مستقیماً photo نمی‌کنیم.
+//
+// این تابع فعلاً از URL داده‌شده استفاده می‌کند.
+// رندر نهایی تصویر را در مرحله بعد حل می‌کنیم.
+// ==========================================
+
+export async function sendSudokuPhoto(
+  token,
+  chatId,
+  photoUrl,
+  keyboard
+) {
+  return telegramRequest(
+    token,
+    "sendPhoto",
+    {
+      chat_id: chatId,
+
+      photo: photoUrl,
+
+      caption:
+        "🧩 بازی سودوکو",
+
+      reply_markup:
+        keyboard
+    }
+  );
+}
+
+
+// ==========================================
+// ویرایش تصویر پیام معمولی
+// ==========================================
+
 export async function updateSudokuPhoto(
   token,
   chatId,
   messageId,
-  svg,
+  photoUrl,
   keyboard
 ) {
-  const base64 = btoa(
-    unescape(
-      encodeURIComponent(svg)
-    )
-  );
-
-  return await telegramRequest(
+  return telegramRequest(
     token,
     "editMessageMedia",
     {
@@ -93,77 +129,71 @@ export async function updateSudokuPhoto(
       media: {
         type: "photo",
 
-        media:
-          `data:image/svg+xml;base64,${base64}`,
+        media: photoUrl,
 
-        caption: "🧩 بازی سودوکو"
+        caption:
+          "🧩 بازی سودوکو"
       },
 
-      reply_markup: keyboard
+      reply_markup:
+        keyboard
     }
   );
 }
 
 
-/**
- * آپدیت پیام Inline
- *
- * این تابع برای زمانی است که بازی
- * از طریق Inline Mode ارسال شده باشد.
- */
+// ==========================================
+// ویرایش تصویر Inline
+// ==========================================
+
 export async function updateInlineSudokuPhoto(
   token,
   inlineMessageId,
-  svg,
+  photoUrl,
   keyboard
 ) {
-  const base64 = btoa(
-    unescape(
-      encodeURIComponent(svg)
-    )
-  );
-
-  return await telegramRequest(
+  return telegramRequest(
     token,
     "editMessageMedia",
     {
-      inline_message_id: inlineMessageId,
+      inline_message_id:
+        inlineMessageId,
 
       media: {
         type: "photo",
 
-        media:
-          `data:image/svg+xml;base64,${base64}`,
+        media: photoUrl,
 
-        caption: "🧩 بازی سودوکو"
+        caption:
+          "🧩 بازی سودوکو"
       },
 
-      reply_markup: keyboard
+      reply_markup:
+        keyboard
     }
   );
 }
 
 
-/**
- * پاسخ به callback query
- *
- * باعث می‌شود لودینگ روی دکمه تلگرام
- * متوقف شود.
- */
+// ==========================================
+// پاسخ به Callback Query
+// ==========================================
+
 export async function answerCallback(
   token,
   callbackQueryId,
   text = null
 ) {
   const body = {
-    callback_query_id: callbackQueryId
+    callback_query_id:
+      callbackQueryId
   };
 
   if (text) {
     body.text = text;
   }
 
-  return await telegramRequest(
+  return telegramRequest(
     token,
     "answerCallbackQuery",
     body
