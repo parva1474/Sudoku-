@@ -541,6 +541,20 @@ export default {
 
       if (
         update.callback_query
+        console.log(
+  'CALLBACK RECEIVED:',
+  JSON.stringify({
+    id: update.callback_query.id,
+    data: update.callback_query.data,
+    inline_message_id: update.callback_query.inline_message_id,
+    message: update.callback_query.message
+      ? {
+          chat_id: update.callback_query.message.chat.id,
+          message_id: update.callback_query.message.message_id
+        }
+      : null
+  })
+);
       ) {
 
         const cq =
