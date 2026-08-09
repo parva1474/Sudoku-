@@ -1152,7 +1152,7 @@ export default {
 // SVG -> PNG با resvg
 // ==========================================
 
-import {
+import (
   Resvg
 } from '@cf-wasm/resvg/workerd';
 
