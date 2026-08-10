@@ -1,6 +1,6 @@
 // ==========================================
 // src/sudoku.js
-// Sudoku Core
+// Sudoku Engine Adapter
 // ==========================================
 
 import {
@@ -9,53 +9,99 @@ import {
   hint
 } from "sudoku-core";
 
-// ------------------------------------------
-// تبدیل خروجی به آرایه 81 خانه‌ای
-// ------------------------------------------
+// ==========================================
+// تبدیل مقدار به خانه استاندارد
+// ==========================================
+
+function normalizeValue(value) {
+  if (
+    value === null ||
+    value === undefined ||
+    value === "" ||
+    value === 0
+  ) {
+    return null;
+  }
+
+  const number = Number(value);
+
+  if (
+    !Number.isInteger(number) ||
+    number < 1 ||
+    number > 9
+  ) {
+    return null;
+  }
+
+  return number;
+}
+
+// ==========================================
+// استاندارد کردن Board
+// ==========================================
 
 function normalizeBoard(board) {
   if (!Array.isArray(board)) {
-    throw new Error("Invalid Sudoku board");
+    throw new Error(
+      "Sudoku board is not an array."
+    );
   }
 
-  return board.map((value) => {
-    if (
-      value === null ||
-      value === undefined ||
-      value === 0 ||
-      value === ""
-    ) {
-      return null;
-    }
+  if (board.length !== 81) {
+    throw new Error(
+      `Invalid Sudoku board length: ${board.length}`
+    );
+  }
 
-    const number = Number(value);
-
-    if (
-      !Number.isInteger(number) ||
-      number < 1 ||
-      number > 9
-    ) {
-      return null;
-    }
-
-    return number;
-  });
+  return board.map(normalizeValue);
 }
 
-// ------------------------------------------
-// ساخت جدول جدید
-// ------------------------------------------
+// ==========================================
+// ساخت Puzzle
+// ==========================================
 
-export function createPuzzle(difficulty = "medium") {
-  const puzzle = normalizeBoard(
-    generate(difficulty)
-  );
+export function createPuzzle(
+  difficulty = "medium"
+) {
+  let generated;
 
-  const solved = solve(puzzle);
+  try {
+    generated =
+      generate({
+        difficulty
+      });
+  } catch (error) {
 
-  const solution = normalizeBoard(
-    solved.board
-  );
+    /*
+     * برای سازگاری با نسخه‌هایی که
+     * difficulty را مستقیم دریافت می‌کنند.
+     */
+
+    generated =
+      generate(difficulty);
+  }
+
+  const puzzle =
+    normalizeBoard(
+      generated
+    );
+
+  const solved =
+    solve(puzzle);
+
+  if (
+    !solved ||
+    !Array.isArray(solved.board)
+  ) {
+    throw new Error(
+      "Sudoku solver returned an invalid result."
+    );
+  }
+
+  const solution =
+    normalizeBoard(
+      solved.board
+    );
 
   return {
     puzzle,
@@ -63,9 +109,9 @@ export function createPuzzle(difficulty = "medium") {
   };
 }
 
-// ------------------------------------------
-// بررسی حرکت بازیکن
-// ------------------------------------------
+// ==========================================
+// بررسی حرکت
+// ==========================================
 
 export function isValidMove(
   solution,
@@ -80,25 +126,33 @@ export function isValidMove(
   }
 
   if (
+    !Number.isInteger(index) ||
     index < 0 ||
     index >= 81
   ) {
     return false;
   }
 
+  const number =
+    Number(value);
+
   if (
-    value < 1 ||
-    value > 9
+    !Number.isInteger(number) ||
+    number < 1 ||
+    number > 9
   ) {
     return false;
   }
 
-  return solution[index] === value;
+  return (
+    Number(solution[index]) ===
+    number
+  );
 }
 
-// ------------------------------------------
-// بررسی کامل شدن جدول
-// ------------------------------------------
+// ==========================================
+// بررسی حل کامل
+// ==========================================
 
 export function isSolved(
   board,
@@ -119,7 +173,11 @@ export function isSolved(
   }
 
   for (let i = 0; i < 81; i++) {
-    if (board[i] !== solution[i]) {
+
+    if (
+      normalizeValue(board[i]) !==
+      normalizeValue(solution[i])
+    ) {
       return false;
     }
   }
@@ -127,9 +185,9 @@ export function isSolved(
   return true;
 }
 
-// ------------------------------------------
-// پیدا کردن Candidateهای یک خانه
-// ------------------------------------------
+// ==========================================
+// Candidateهای یک خانه
+// ==========================================
 
 export function getCandidates(
   board,
@@ -143,13 +201,19 @@ export function getCandidates(
   }
 
   if (
+    !Number.isInteger(index) ||
     index < 0 ||
     index >= 81
   ) {
     return [];
   }
 
-  if (board[index] !== null) {
+  const current =
+    normalizeValue(
+      board[index]
+    );
+
+  if (current !== null) {
     return [];
   }
 
@@ -162,27 +226,50 @@ export function getCandidates(
   const used =
     new Set();
 
-  // سطر
-  for (let c = 0; c < 9; c++) {
+  // ----------------------------------------
+  // Row
+  // ----------------------------------------
+
+  for (
+    let c = 0;
+    c < 9;
+    c++
+  ) {
+
     const value =
-      board[row * 9 + c];
+      normalizeValue(
+        board[row * 9 + c]
+      );
 
     if (value !== null) {
       used.add(value);
     }
   }
 
-  // ستون
-  for (let r = 0; r < 9; r++) {
+  // ----------------------------------------
+  // Column
+  // ----------------------------------------
+
+  for (
+    let r = 0;
+    r < 9;
+    r++
+  ) {
+
     const value =
-      board[r * 9 + col];
+      normalizeValue(
+        board[r * 9 + col]
+      );
 
     if (value !== null) {
       used.add(value);
     }
   }
 
-  // باکس 3×3
+  // ----------------------------------------
+  // 3x3 Box
+  // ----------------------------------------
+
   const boxRow =
     Math.floor(row / 3) * 3;
 
@@ -194,13 +281,17 @@ export function getCandidates(
     r < boxRow + 3;
     r++
   ) {
+
     for (
       let c = boxCol;
       c < boxCol + 3;
       c++
     ) {
+
       const value =
-        board[r * 9 + c];
+        normalizeValue(
+          board[r * 9 + c]
+        );
 
       if (value !== null) {
         used.add(value);
@@ -210,37 +301,29 @@ export function getCandidates(
 
   const candidates = [];
 
-  for (let n = 1; n <= 9; n++) {
-    if (!used.has(n)) {
-      candidates.push(n);
+  for (
+    let number = 1;
+    number <= 9;
+    number++
+  ) {
+
+    if (
+      !used.has(number)
+    ) {
+      candidates.push(number);
     }
   }
 
   return candidates;
 }
 
-// ------------------------------------------
-// راهنمایی Sudoku
-// ------------------------------------------
+// ==========================================
+// بررسی معتبر بودن کل جدول
+// ==========================================
 
-export function getHint(board) {
-  try {
-    return hint(board);
-  } catch (error) {
-    console.error(
-      "Sudoku hint error:",
-      error
-    );
-
-    return null;
-  }
-}
-
-// ------------------------------------------
-// بررسی اعتبار جدول
-// ------------------------------------------
-
-export function isBoardValid(board) {
+export function isBoardValid(
+  board
+) {
   if (
     !Array.isArray(board) ||
     board.length !== 81
@@ -248,19 +331,37 @@ export function isBoardValid(board) {
     return false;
   }
 
-  // سطرها
-  for (let row = 0; row < 9; row++) {
-    const seen = new Set();
+  // ----------------------------------------
+  // Rows
+  // ----------------------------------------
 
-    for (let col = 0; col < 9; col++) {
+  for (
+    let row = 0;
+    row < 9;
+    row++
+  ) {
+
+    const seen =
+      new Set();
+
+    for (
+      let col = 0;
+      col < 9;
+      col++
+    ) {
+
       const value =
-        board[row * 9 + col];
+        normalizeValue(
+          board[row * 9 + col]
+        );
 
       if (value === null) {
         continue;
       }
 
-      if (seen.has(value)) {
+      if (
+        seen.has(value)
+      ) {
         return false;
       }
 
@@ -268,19 +369,37 @@ export function isBoardValid(board) {
     }
   }
 
-  // ستون‌ها
-  for (let col = 0; col < 9; col++) {
-    const seen = new Set();
+  // ----------------------------------------
+  // Columns
+  // ----------------------------------------
 
-    for (let row = 0; row < 9; row++) {
+  for (
+    let col = 0;
+    col < 9;
+    col++
+  ) {
+
+    const seen =
+      new Set();
+
+    for (
+      let row = 0;
+      row < 9;
+      row++
+    ) {
+
       const value =
-        board[row * 9 + col];
+        normalizeValue(
+          board[row * 9 + col]
+        );
 
       if (value === null) {
         continue;
       }
 
-      if (seen.has(value)) {
+      if (
+        seen.has(value)
+      ) {
         return false;
       }
 
@@ -288,14 +407,36 @@ export function isBoardValid(board) {
     }
   }
 
-  // باکس‌ها
-  for (let boxRow = 0; boxRow < 3; boxRow++) {
-    for (let boxCol = 0; boxCol < 3; boxCol++) {
+  // ----------------------------------------
+  // Boxes
+  // ----------------------------------------
 
-      const seen = new Set();
+  for (
+    let boxRow = 0;
+    boxRow < 3;
+    boxRow++
+  ) {
 
-      for (let r = 0; r < 3; r++) {
-        for (let c = 0; c < 3; c++) {
+    for (
+      let boxCol = 0;
+      boxCol < 3;
+      boxCol++
+    ) {
+
+      const seen =
+        new Set();
+
+      for (
+        let r = 0;
+        r < 3;
+        r++
+      ) {
+
+        for (
+          let c = 0;
+          c < 3;
+          c++
+        ) {
 
           const row =
             boxRow * 3 + r;
@@ -304,13 +445,17 @@ export function isBoardValid(board) {
             boxCol * 3 + c;
 
           const value =
-            board[row * 9 + col];
+            normalizeValue(
+              board[row * 9 + col]
+            );
 
           if (value === null) {
             continue;
           }
 
-          if (seen.has(value)) {
+          if (
+            seen.has(value)
+          ) {
             return false;
           }
 
@@ -321,4 +466,106 @@ export function isBoardValid(board) {
   }
 
   return true;
+}
+
+// ==========================================
+// دریافت Hint
+// ==========================================
+
+export function getHint(
+  board
+) {
+  const normalized =
+    normalizeBoard(
+      board
+    );
+
+  try {
+
+    return hint(
+      normalized
+    );
+
+  } catch (error) {
+
+    console.error(
+      "sudoku-core hint error:",
+      error
+    );
+
+    return null;
+  }
+}
+
+// ==========================================
+// استخراج حرکت از Hint
+// ==========================================
+
+export function extractHintMove(
+  result
+) {
+  if (!result) {
+    return null;
+  }
+
+  /*
+   * بعضی نسخه‌ها / خروجی‌ها ممکن است
+   * حرکت را در یکی از این ساختارها
+   * قرار دهند.
+   */
+
+  const candidates = [
+    result.move,
+    result.step,
+    result.hint,
+    result.solution,
+    result.steps?.[0]
+  ];
+
+  for (
+    const candidate of candidates
+  ) {
+
+    if (!candidate) {
+      continue;
+    }
+
+    if (
+      Number.isInteger(
+        candidate.index
+      ) &&
+      Number.isInteger(
+        candidate.value
+      )
+    ) {
+
+      return {
+        index:
+          candidate.index,
+
+        value:
+          candidate.value
+      };
+    }
+
+    if (
+      Number.isInteger(
+        candidate.cell
+      ) &&
+      Number.isInteger(
+        candidate.value
+      )
+    ) {
+
+      return {
+        index:
+          candidate.cell,
+
+        value:
+          candidate.value
+      };
+    }
+  }
+
+  return null;
 }
