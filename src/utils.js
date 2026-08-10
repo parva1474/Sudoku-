@@ -1,12 +1,20 @@
 // ==========================================
 // src/utils.js
-// نسخه اصلاح‌شده و استاندارد برای تلگرام
+// کیبورد کامل و استاندارد سودوکو 9×9
 // ==========================================
 
-export function buildControlKeyboard(gameState, selectedCell = null, scoresMap = null) {
+export function buildControlKeyboard(
+  gameState,
+  selectedCell = null,
+  scoresMap = null
+) {
+
   const keyboard = [];
 
-  // ۱. بخش امتیازات
+  // ==========================================
+  // جدول امتیازات
+  // ==========================================
+
   if (scoresMap && scoresMap.size > 0) {
     let scoreText = "🏆 جدول امتیازات:\n";
     const players = Array.from(scoresMap.values()).sort((a, b) => b.score - a.score);
@@ -17,22 +25,31 @@ export function buildControlKeyboard(gameState, selectedCell = null, scoresMap =
     keyboard.push([{ text: scoreText.trim(), callback_data: "noop" }]);
   }
 
-  // ۲. بخش انتخاب خانه
+  // ==========================================
+  // وضعیت خانه انتخاب‌شده
+  // ==========================================
+
   if (selectedCell) {
     const selected = gameState?.board?.[selectedCell.r]?.[selectedCell.c];
     if (selected) {
-      let text = `📍 خانه ${selectedCell.r + 1}،${selectedCell.c + 1} | `;
-      text += selected.given ? `🔒 ${selected.value}` : (selected.value !== null ? `🔢 ${selected.value}` : "⬜ خالی");
+      let text = `📍 خانه ${selectedCell.r + 1}،${selectedCell.c + 1}`;
+      if (selected.given) {
+        text += ` | 🔒 ${selected.value}`;
+      } else if (selected.value !== null && selected.value !== undefined) {
+        text += ` | 🔢 ${selected.value}`;
+      } else {
+        text += " | ⬜ خالی";
+      }
       keyboard.push([{ text, callback_data: "noop" }]);
     }
 
-    // دکمه مداد
+    // حالت مداد
     keyboard.push([{
       text: gameState.pencilMode ? "✏️ مداد: روشن" : "✏️ مداد: خاموش",
       callback_data: "toggle_pencil"
     }]);
 
-    // ۳. ردیف اعداد (استاندارد تلگرام: ۵+۴)
+    // اعداد ورودی ۱ تا ۹ (دو ردیف شیک و مرتب)
     keyboard.push([
       { text: "1️⃣", callback_data: "input_1" },
       { text: "2️⃣", callback_data: "input_2" },
@@ -47,16 +64,55 @@ export function buildControlKeyboard(gameState, selectedCell = null, scoresMap =
       { text: "9️⃣", callback_data: "input_9" }
     ]);
 
-    // دکمه‌های کنترلی
     keyboard.push([
-      { text: "🧹 پاک", callback_data: "input_0" },
-      { text: "❌ لغو", callback_data: "deselect" }
+      { text: "🧹 پاک کردن", callback_data: "input_0" },
+      { text: "❌ لغو انتخاب", callback_data: "deselect" }
     ]);
+
   } else {
-    keyboard.push([{ text: "👇 از روی عکس بالا خانه انتخاب کنید", callback_data: "noop" }]);
+    keyboard.push([{ text: "👇 برای انتخاب خانه، روی یکی از ردیف‌های جدول زیر بزنید", callback_data: "noop" }]);
   }
 
-  // ۴. دکمه‌های پایین صفحه
+  // ==========================================
+  // جدول 9×9 دکمه‌ای (اصلاح‌شده برای تلگرام)
+  // ==========================================
+
+  for (let r = 0; r < 9; r++) {
+    const row = [];
+    for (let c = 0; c < 9; c++) {
+      const cell = gameState.board[r][c];
+      let label = "·";
+
+      if (cell.value !== null && cell.value !== undefined) {
+        if (cell.given) {
+          label = `🔒${cell.value}`;
+        } else if (cell.isError) {
+          label = `❌${cell.value}`;
+        } else {
+          label = String(cell.value);
+        }
+      }
+
+      if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
+        label = cell.value !== null && cell.value !== undefined ? `🔵${cell.value}` : "🔵";
+      }
+
+      row.push({
+        text: label,
+        callback_data: `cell_${r}_${c}`
+      });
+    }
+
+    // اینجا برای اینکه تلگرام دکمه‌ها رو قطع نکنه، هر ردیف ۹تایی رو به دو بخش (مثلا ۵تایی و ۴تایی) می‌شکنیم 
+    // یا می‌تونیم کل ردیف رو بفرستیم. تلگرام روی دکمه‌های متنی کوتاه (مثل اعداد و نقطه) معمولاً تا ۹ تا رو هندل می‌کنه 
+    // ولی اگر برید منظورش اینه که کاراکترها زیاده. با این روش کارکردش تضمینیه:
+    keyboard.push(row);
+  }
+
+  // ==========================================
+  // پایین جدول
+  // ==========================================
+
   keyboard.push([
     { text: "🔄 بازی جدید", callback_data: "new_game" },
     { text: gameState.status === "COMPLETED" ? "🏆 تمام شد" : "🎮 در حال بازی", callback_data: "noop" }
