@@ -526,4 +526,4 @@ export function renderSudokuSVG(
 
 </svg>
 `;
-      }
+}
