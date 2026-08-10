@@ -5,7 +5,6 @@
 // ==========================================
 
 import {
-  telegramRequest,
   sendMessage,
   editMessageText,
   answerCallbackQuery
@@ -18,7 +17,8 @@ import {
   toggleNote,
   putNumber,
   eraseNumber,
-  getProgress
+  getProgress,
+  applyHint
 } from "./game.js";
 
 import {
@@ -54,46 +54,24 @@ export default {
 
   async fetch(request, env) {
 
-    // --------------------------------------
-    // GET
-    // --------------------------------------
-
     if (request.method === "GET") {
-
       return new Response(
         "🧩 Sudoku Bot is running.",
-        {
-          status: 200
-        }
+        { status: 200 }
       );
     }
 
-    // --------------------------------------
-    // فقط POST
-    // --------------------------------------
-
     if (request.method !== "POST") {
-
       return new Response(
         "Method Not Allowed",
-        {
-          status: 405
-        }
+        { status: 405 }
       );
     }
 
     try {
 
-      // ------------------------------------
-      // بررسی JSON
-      // ------------------------------------
-
       const update =
         await request.json();
-
-      // ------------------------------------
-      // Token
-      // ------------------------------------
 
       const token =
         env.BOT_TOKEN;
@@ -106,15 +84,9 @@ export default {
 
         return new Response(
           "BOT_TOKEN is missing.",
-          {
-            status: 500
-          }
+          { status: 500 }
         );
       }
-
-      // ------------------------------------
-      // Message
-      // ------------------------------------
 
       if (update.message) {
 
@@ -125,10 +97,6 @@ export default {
         );
       }
 
-      // ------------------------------------
-      // Callback
-      // ------------------------------------
-
       if (update.callback_query) {
 
         await handleCallbackQuery(
@@ -138,12 +106,7 @@ export default {
         );
       }
 
-      return new Response(
-        "OK",
-        {
-          status: 200
-        }
-      );
+      return new Response("OK");
 
     } catch (error) {
 
@@ -154,9 +117,7 @@ export default {
 
       return new Response(
         "Internal Server Error",
-        {
-          status: 500
-        }
+        { status: 500 }
       );
     }
   }
@@ -190,13 +151,11 @@ async function handleMessage(
       message.text || ""
     ).trim();
 
-  // ========================================
+  // ----------------------------------------
   // /start
-  // ========================================
+  // ----------------------------------------
 
-  if (
-    text === "/start"
-  ) {
+  if (text === "/start") {
 
     await sendWelcome(
       token,
@@ -206,13 +165,11 @@ async function handleMessage(
     return;
   }
 
-  // ========================================
+  // ----------------------------------------
   // /new
-  // ========================================
+  // ----------------------------------------
 
-  if (
-    text === "/new"
-  ) {
+  if (text === "/new") {
 
     await startNewGame(
       env,
@@ -225,12 +182,20 @@ async function handleMessage(
     return;
   }
 
-  // ========================================
-  // /easy
-  // ========================================
+  // ----------------------------------------
+  // Difficulty commands
+  // ----------------------------------------
+
+  const difficultyCommands = {
+    "/easy": "easy",
+    "/medium": "medium",
+    "/hard": "hard",
+    "/expert": "expert",
+    "/master": "master"
+  };
 
   if (
-    text === "/easy"
+    difficultyCommands[text]
   ) {
 
     await startNewGame(
@@ -238,95 +203,17 @@ async function handleMessage(
       token,
       chatId,
       userId,
-      "easy"
+      difficultyCommands[text]
     );
 
     return;
   }
 
-  // ========================================
-  // /medium
-  // ========================================
-
-  if (
-    text === "/medium"
-  ) {
-
-    await startNewGame(
-      env,
-      token,
-      chatId,
-      userId,
-      "medium"
-    );
-
-    return;
-  }
-
-  // ========================================
-  // /hard
-  // ========================================
-
-  if (
-    text === "/hard"
-  ) {
-
-    await startNewGame(
-      env,
-      token,
-      chatId,
-      userId,
-      "hard"
-    );
-
-    return;
-  }
-
-  // ========================================
-  // /expert
-  // ========================================
-
-  if (
-    text === "/expert"
-  ) {
-
-    await startNewGame(
-      env,
-      token,
-      chatId,
-      userId,
-      "expert"
-    );
-
-    return;
-  }
-
-  // ========================================
-  // /master
-  // ========================================
-
-  if (
-    text === "/master"
-  ) {
-
-    await startNewGame(
-      env,
-      token,
-      chatId,
-      userId,
-      "master"
-    );
-
-    return;
-  }
-
-  // ========================================
+  // ----------------------------------------
   // /game
-  // ========================================
+  // ----------------------------------------
 
-  if (
-    text === "/game"
-  ) {
+  if (text === "/game") {
 
     const game =
       await loadGame(
@@ -354,13 +241,11 @@ async function handleMessage(
     return;
   }
 
-  // ========================================
+  // ----------------------------------------
   // /help
-  // ========================================
+  // ----------------------------------------
 
-  if (
-    text === "/help"
-  ) {
+  if (text === "/help") {
 
     await sendHelp(
       token,
@@ -385,16 +270,7 @@ async function sendWelcome(
     "",
     "به بازی سودوکو خوش آمدی!",
     "",
-    "از دستورهای زیر استفاده کن:",
-    "",
-    "🟢 /easy",
-    "🟡 /medium",
-    "🔴 /hard",
-    "🟣 /expert",
-    "⚫ /master",
-    "",
-    "یا برای شروع سریع:",
-    "/new"
+    "درجه سختی را انتخاب کن:"
   ].join("\n");
 
   await sendMessage(
@@ -417,13 +293,13 @@ async function sendHelp(
   const text = [
     "🧩 <b>راهنمای Sudoku</b>",
     "",
-    "1️⃣ روی یک خانه بزن.",
-    "2️⃣ عدد موردنظر را انتخاب کن.",
-    "3️⃣ برای یادداشت از ✏️ مداد استفاده کن.",
-    "4️⃣ برای پاک کردن عدد 🧹 را بزن.",
-    "5️⃣ با 💡 می‌توانی راهنمایی بگیری.",
+    "👆 روی یک خانه بزن.",
+    "🔢 عدد موردنظر را انتخاب کن.",
+    "✏️ برای Pencil حالت مداد را روشن کن.",
+    "🧹 برای پاک کردن عدد استفاده کن.",
+    "💡 راهنمایی یک حرکت درست را وارد می‌کند.",
     "",
-    "عددهای اولیه با 🔒 مشخص هستند و قابل تغییر نیستند."
+    "🔒 خانه‌های اولیه قابل تغییر نیستند."
   ].join("\n");
 
   await sendMessage(
@@ -471,7 +347,7 @@ async function startNewGame(
     await sendMessage(
       token,
       chatId,
-      "❌ در ساخت جدول Sudoku مشکلی پیش آمد. دوباره تلاش کن."
+      "❌ ساخت جدول Sudoku با خطا مواجه شد."
     );
 
     return;
@@ -492,7 +368,7 @@ async function startNewGame(
 }
 
 // ==========================================
-// Callback Query
+// Callback Handler
 // ==========================================
 
 async function handleCallbackQuery(
@@ -518,9 +394,7 @@ async function handleCallbackQuery(
   }
 
   const chatId =
-    String(
-      message.chat.id
-    );
+    String(message.chat.id);
 
   const userId =
     String(
@@ -533,19 +407,9 @@ async function handleCallbackQuery(
       callback.data || ""
     );
 
-  // ========================================
-  // بازی را از D1 بخوان
-  // ========================================
-
-  let game =
-    await loadGame(
-      env,
-      chatId
-    );
-
-  // ========================================
-  // انتخاب درجه سختی
-  // ========================================
+  // ----------------------------------------
+  // Difficulty
+  // ----------------------------------------
 
   if (
     data.startsWith(
@@ -571,10 +435,8 @@ async function handleCallbackQuery(
       return;
     }
 
-    game =
-      newGame(
-        difficulty
-      );
+    const game =
+      newGame(difficulty);
 
     await saveGame(
       env,
@@ -592,15 +454,21 @@ async function handleCallbackQuery(
     await answerCallbackQuery(
       token,
       callbackId,
-      `Sudoku ${difficulty} ساخته شد.`
+      "🎮 بازی شروع شد."
     );
 
     return;
   }
 
-  // ========================================
-  // اگر بازی وجود ندارد
-  // ========================================
+  // ----------------------------------------
+  // Load game
+  // ----------------------------------------
+
+  let game =
+    await loadGame(
+      env,
+      chatId
+    );
 
   if (!game) {
 
@@ -618,9 +486,7 @@ async function handleCallbackQuery(
   // ========================================
 
   if (
-    data.startsWith(
-      "cell:"
-    )
+    data.startsWith("cell:")
   ) {
 
     const index =
@@ -643,6 +509,11 @@ async function handleCallbackQuery(
       return;
     }
 
+    /*
+     * خانه اولیه قابل انتخاب است،
+     * اما نمی‌توان عددش را تغییر داد.
+     */
+
     selectCell(
       game,
       index
@@ -655,10 +526,43 @@ async function handleCallbackQuery(
       game
     );
 
-    await editGameMessage(
+    /*
+     * اگر خانه قفل باشد، همان جدول را
+     * نشان بده و اجازه انتخاب عدد نده.
+     */
+
+    if (
+      game.puzzle[index] !== null
+    ) {
+
+      await editMessageText(
+        token,
+        message.chat.id,
+        message.message_id,
+        createBoardText(game),
+        buildSudokuKeyboard(game)
+      );
+
+      await answerCallbackQuery(
+        token,
+        callbackId,
+        "🔒 این خانه ثابت است."
+      );
+
+      return;
+    }
+
+    /*
+     * خانه آزاد:
+     * صفحه اعداد را نشان بده.
+     */
+
+    await editMessageText(
       token,
-      message,
-      game
+      message.chat.id,
+      message.message_id,
+      createNumberScreenText(game),
+      buildNumberKeyboard(game)
     );
 
     await answerCallbackQuery(
@@ -670,16 +574,14 @@ async function handleCallbackQuery(
   }
 
   // ========================================
-  // حالت Pencil
+  // Pencil
   // ========================================
 
   if (
     data === "mode:pencil"
   ) {
 
-    togglePencilMode(
-      game
-    );
+    togglePencilMode(game);
 
     await saveGame(
       env,
@@ -688,11 +590,36 @@ async function handleCallbackQuery(
       game
     );
 
-    await editGameMessage(
-      token,
-      message,
-      game
-    );
+    /*
+     * اگر خانه انتخاب شده باشد،
+     * صفحه اعداد باقی می‌ماند.
+     */
+
+    if (
+      game.selectedCell !== -1 &&
+      game.puzzle[
+        game.selectedCell
+      ] === null
+    ) {
+
+      await editMessageText(
+        token,
+        message.chat.id,
+        message.message_id,
+        createNumberScreenText(game),
+        buildNumberKeyboard(game)
+      );
+
+    } else {
+
+      await editMessageText(
+        token,
+        message.chat.id,
+        message.message_id,
+        createBoardText(game),
+        buildSudokuKeyboard(game)
+      );
+    }
 
     await answerCallbackQuery(
       token,
@@ -706,7 +633,7 @@ async function handleCallbackQuery(
   }
 
   // ========================================
-  // پاک کردن
+  // Erase
   // ========================================
 
   if (
@@ -732,17 +659,6 @@ async function handleCallbackQuery(
         game.selectedCell
       );
 
-    if (!result.ok) {
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        result.message
-      );
-
-      return;
-    }
-
     await saveGame(
       env,
       chatId,
@@ -750,29 +666,31 @@ async function handleCallbackQuery(
       game
     );
 
-    await editGameMessage(
+    await editMessageText(
       token,
-      message,
-      game
+      message.chat.id,
+      message.message_id,
+      createNumberScreenText(game),
+      buildNumberKeyboard(game)
     );
 
     await answerCallbackQuery(
       token,
       callbackId,
-      "پاک شد."
+      result.ok
+        ? "🧹 پاک شد."
+        : result.message
     );
 
     return;
   }
 
   // ========================================
-  // وارد کردن عدد
+  // Number
   // ========================================
 
   if (
-    data.startsWith(
-      "num:"
-    )
+    data.startsWith("num:")
   ) {
 
     if (
@@ -811,17 +729,6 @@ async function handleCallbackQuery(
           number
         );
 
-      if (!result.ok) {
-
-        await answerCallbackQuery(
-          token,
-          callbackId,
-          result.message
-        );
-
-        return;
-      }
-
       await saveGame(
         env,
         chatId,
@@ -829,25 +736,31 @@ async function handleCallbackQuery(
         game
       );
 
-      await editGameMessage(
+      await editMessageText(
         token,
-        message,
-        game
+        message.chat.id,
+        message.message_id,
+        createNumberScreenText(game),
+        buildNumberKeyboard(game)
       );
 
       await answerCallbackQuery(
         token,
         callbackId,
-        result.added
-          ? `✏️ ${number} اضافه شد.`
-          : `✏️ ${number} حذف شد.`
+        result.ok
+          ? (
+              result.added
+                ? `✏️ ${number} اضافه شد.`
+                : `✏️ ${number} حذف شد.`
+            )
+          : result.message
       );
 
       return;
     }
 
     // --------------------------------------
-    // عدد واقعی
+    // عدد اصلی
     // --------------------------------------
 
     const result =
@@ -864,39 +777,72 @@ async function handleCallbackQuery(
       game
     );
 
-    await editGameMessage(
-      token,
-      message,
-      game
-    );
-
-    if (
-      result.mistake
-    ) {
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        `❌ اشتباه! تعداد خطا: ${result.mistakes}`,
-        false
-      );
-
-      return;
-    }
+    // --------------------------------------
+    // اگر بازی تمام شد
+    // --------------------------------------
 
     if (
       result.won
     ) {
 
+      await editMessageText(
+        token,
+        message.chat.id,
+        message.message_id,
+        createBoardText(game),
+        buildFinishedKeyboard()
+      );
+
       await answerCallbackQuery(
         token,
         callbackId,
-        "🎉 برنده شدی!",
-        false
+        "🎉 تبریک! Sudoku حل شد."
       );
 
       return;
     }
+
+    // --------------------------------------
+    // عدد اشتباه
+    // --------------------------------------
+
+    if (
+      result.mistake
+    ) {
+
+      /*
+       * بعد از اشتباه دوباره صفحه عددها
+       * نمایش داده می‌شود.
+       */
+
+      await editMessageText(
+        token,
+        message.chat.id,
+        message.message_id,
+        createNumberScreenText(game),
+        buildNumberKeyboard(game)
+      );
+
+      await answerCallbackQuery(
+        token,
+        callbackId,
+        `❌ اشتباه! خطا: ${game.mistakes}`
+      );
+
+      return;
+    }
+
+    // --------------------------------------
+    // عدد صحیح
+    // --------------------------------------
+
+    await editMessageText(
+      token,
+      message.chat.id,
+      message.message_id,
+      createBoardText(game),
+      buildSudokuKeyboard(game)
+    );
 
     await answerCallbackQuery(
       token,
@@ -908,34 +854,85 @@ async function handleCallbackQuery(
   }
 
   // ========================================
-  // راهنمایی
+  // Hint
   // ========================================
 
   if (
     data === "action:hint"
   ) {
 
-    const result =
-      await processHint(
-        token,
-        chatId,
-        userId,
-        game,
-        message,
-        env
+    let hintResult = null;
+
+    try {
+
+      hintResult =
+        getHint(
+          game.board
+        );
+
+    } catch (error) {
+
+      console.error(
+        "Hint error:",
+        error
       );
+    }
+
+    const result =
+      applyHint(
+        game,
+        hintResult
+      );
+
+    await saveGame(
+      env,
+      chatId,
+      userId,
+      game
+    );
+
+    if (
+      result.won
+    ) {
+
+      await editMessageText(
+        token,
+        message.chat.id,
+        message.message_id,
+        createBoardText(game),
+        buildFinishedKeyboard()
+      );
+
+      await answerCallbackQuery(
+        token,
+        callbackId,
+        "🎉 راهنمایی باعث تکمیل جدول شد."
+      );
+
+      return;
+    }
+
+    await editMessageText(
+      token,
+      message.chat.id,
+      message.message_id,
+      createBoardText(game),
+      buildSudokuKeyboard(game)
+    );
 
     await answerCallbackQuery(
       token,
       callbackId,
-      result
+      result.ok
+        ? result.message
+        : result.message
     );
 
     return;
   }
 
   // ========================================
-  // بازی جدید
+  // New Game
   // ========================================
 
   if (
@@ -970,7 +967,7 @@ async function handleCallbackQuery(
   }
 
   // ========================================
-  // بازگشت به جدول
+  // Back to board
   // ========================================
 
   if (
@@ -991,115 +988,10 @@ async function handleCallbackQuery(
     return;
   }
 
-  // ========================================
-  // Callback ناشناخته
-  // ========================================
-
   await answerCallbackQuery(
     token,
     callbackId
   );
-}
-
-// ==========================================
-// راهنمایی Sudoku
-// ==========================================
-
-async function processHint(
-  token,
-  chatId,
-  userId,
-  game,
-  message,
-  env
-) {
-
-  if (
-    game.status !== "playing"
-  ) {
-    return "این بازی تمام شده است.";
-  }
-
-  try {
-
-    const result =
-      getHint(
-        game.board
-      );
-
-    game.hints++;
-
-    await saveGame(
-      env,
-      chatId,
-      userId,
-      game
-    );
-
-    /*
-     * بسته به API sudoku-core،
-     * hint ممکن است اطلاعات مختلفی
-     * درباره حرکت پیشنهادی برگرداند.
-     */
-
-    if (!result) {
-
-      return "💡 فعلاً راهنمایی مناسبی پیدا نشد.";
-    }
-
-    const hintText =
-      formatHint(result);
-
-    await editGameMessage(
-      token,
-      message,
-      game
-    );
-
-    return hintText;
-
-  } catch (error) {
-
-    console.error(
-      "Hint error:",
-      error
-    );
-
-    return "❌ دریافت راهنمایی با خطا مواجه شد.";
-  }
-}
-
-// ==========================================
-// تبدیل Hint به متن
-// ==========================================
-
-function formatHint(result) {
-
-  if (
-    typeof result === "string"
-  ) {
-    return `💡 ${result}`;
-  }
-
-  if (
-    result.message
-  ) {
-    return `💡 ${result.message}`;
-  }
-
-  if (
-    result.description
-  ) {
-    return `💡 ${result.description}`;
-  }
-
-  if (
-    result.strategy
-  ) {
-    return `💡 روش پیشنهادی: ${result.strategy}`;
-  }
-
-  return "💡 یک حرکت منطقی برای ادامه بازی پیدا شد.";
 }
 
 // ==========================================
@@ -1112,26 +1004,16 @@ async function sendGameMessage(
   game
 ) {
 
-  const text =
-    createBoardText(
-      game
-    );
-
-  const keyboard =
-    buildSudokuKeyboard(
-      game
-    );
-
   await sendMessage(
     token,
     chatId,
-    text,
-    keyboard
+    createBoardText(game),
+    buildSudokuKeyboard(game)
   );
 }
 
 // ==========================================
-// ویرایش بازی
+// ویرایش صفحه بازی
 // ==========================================
 
 async function editGameMessage(
@@ -1139,15 +1021,6 @@ async function editGameMessage(
   message,
   game
 ) {
-
-  const text =
-    createBoardText(
-      game
-    );
-
-  // --------------------------------------
-  // بازی تمام شده
-  // --------------------------------------
 
   if (
     game.status === "won"
@@ -1157,30 +1030,70 @@ async function editGameMessage(
       token,
       message.chat.id,
       message.message_id,
-      text,
+      createBoardText(game),
       buildFinishedKeyboard()
     );
 
     return;
   }
 
-  // --------------------------------------
-  // حالت عادی
-  // --------------------------------------
-
   await editMessageText(
     token,
     message.chat.id,
     message.message_id,
-    text,
-    buildSudokuKeyboard(
-      game
-    )
+    createBoardText(game),
+    buildSudokuKeyboard(game)
   );
 }
 
 // ==========================================
-// ساخت متن جدول
+// متن صفحه اعداد
+// ==========================================
+
+function createNumberScreenText(
+  game
+) {
+
+  const index =
+    game.selectedCell;
+
+  const row =
+    Math.floor(index / 9) + 1;
+
+  const col =
+    (index % 9) + 1;
+
+  const notes =
+    Array.isArray(
+      game.notes[index]
+    )
+      ? game.notes[index]
+      : [];
+
+  const current =
+    game.board[index];
+
+  const lines = [
+    "🔢 <b>انتخاب عدد</b>",
+    "",
+    `📍 خانه: سطر ${row}، ستون ${col}`,
+    `🔢 مقدار فعلی: ${current ?? "خالی"}`,
+    `✏️ Pencil: ${
+      notes.length
+        ? notes.join(" ")
+        : "—"
+    }`,
+    "",
+    game.pencilMode
+      ? "✏️ <b>حالت مداد فعال است</b>"
+      : "عدد موردنظر را انتخاب کن:"
+  ];
+
+  return lines.join("\n");
+}
+
+// ==========================================
+// متن جدول
 // ==========================================
 
 function createBoardText(
@@ -1210,10 +1123,6 @@ function createBoardText(
   );
 
   lines.push("");
-
-  // --------------------------------------
-  // جدول
-  // --------------------------------------
 
   for (
     let row = 0;
@@ -1247,17 +1156,19 @@ function createBoardText(
       } else {
 
         const notes =
-          game.notes[index];
+          Array.isArray(
+            game.notes[index]
+          )
+            ? game.notes[index]
+            : [];
 
         text =
-          notes.length > 0
+          notes.length
             ? notes.join("")
             : "·";
       }
 
-      cells.push(
-        text
-      );
+      cells.push(text);
     }
 
     lines.push(
@@ -1267,32 +1178,30 @@ function createBoardText(
 
   lines.push("");
 
-  // --------------------------------------
-  // وضعیت
-  // --------------------------------------
-
   if (
     game.status === "won"
   ) {
 
     lines.push(
-      "🎉 <b>تبریک! جدول حل شد.</b>"
-    );
-
-  } else if (
-    game.pencilMode
-  ) {
-
-    lines.push(
-      "✏️ <b>حالت مداد فعال است</b>"
+      "🎉 <b>جدول حل شد!</b>"
     );
 
   } else if (
     game.selectedCell !== -1
   ) {
 
+    const row =
+      Math.floor(
+        game.selectedCell / 9
+      ) + 1;
+
+    const col =
+      (
+        game.selectedCell % 9
+      ) + 1;
+
     lines.push(
-      `📍 خانه انتخاب‌شده: ${formatCell(game.selectedCell)}`
+      `📍 خانه انتخاب‌شده: ${row},${col}`
     );
 
   } else {
@@ -1306,7 +1215,7 @@ function createBoardText(
 }
 
 // ==========================================
-// نام فارسی درجه سختی
+// نام درجه سختی
 // ==========================================
 
 function getDifficultyName(
@@ -1315,20 +1224,15 @@ function getDifficultyName(
 
   const names = {
 
-    easy:
-      "🟢 آسان",
+    easy: "🟢 آسان",
 
-    medium:
-      "🟡 متوسط",
+    medium: "🟡 متوسط",
 
-    hard:
-      "🔴 سخت",
+    hard: "🔴 سخت",
 
-    expert:
-      "🟣 خیلی سخت",
+    expert: "🟣 خیلی سخت",
 
-    master:
-      "⚫ استاد"
+    master: "⚫ استاد"
   };
 
   return (
@@ -1338,37 +1242,8 @@ function getDifficultyName(
 }
 
 // ==========================================
-// نمایش مختصات خانه
+// ذخیره بازی
 // ==========================================
-
-function formatCell(index) {
-
-  const row =
-    Math.floor(index / 9);
-
-  const col =
-    index % 9;
-
-  const letters = [
-    "A",
-    "B",
-    "C",
-    "D",
-    "E",
-    "F",
-    "G",
-    "H",
-    "I"
-  ];
-
-  return (
-    `${letters[col]}${row + 1}`
-  );
-}
-
-// ==========================================
-// ذخیره بازی در D1
-// =========================================
 
 async function saveGame(
   env,
@@ -1408,7 +1283,6 @@ async function saveGame(
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     .bind(
-
       chatId,
 
       userId,
@@ -1447,13 +1321,12 @@ async function saveGame(
         now,
 
       now
-
     )
     .run();
 }
 
 // ==========================================
-// دریافت بازی از D1
+// دریافت بازی
 // ==========================================
 
 async function loadGame(
@@ -1535,4 +1408,3 @@ async function loadGame(
       Number(
         row.created_at
       )
-  };
