@@ -10,11 +10,11 @@
   },
 
   "dependencies": {
-    "@cf-wasm/resvg": "^0.4.2",
+    "@cf-wasm/resvg": "0.3.4",
     "sudoku-core": "3.0.3"
   },
 
   "devDependencies": {
-    "wrangler": "^4.114.0"
+    "wrangler": "^4.120.1"
   }
 }
