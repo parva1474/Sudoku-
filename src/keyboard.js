@@ -1,29 +1,34 @@
 // ==========================================
 // src/keyboard.js
-// Inline Keyboard سودوکو
+// Inline Keyboard سودوکو برای Telegram
+// ==========================================
+
+// ==========================================
+// نمایش مقدار خانه
 // ==========================================
 
 function getCellText(game, index) {
   const value = game.board[index];
 
-  // خانه دارای عدد
+  // عدد واقعی
   if (value !== null) {
     return String(value);
   }
 
-  // خانه دارای Pencil
-  const notes = game.notes[index];
+  // Pencil
+  const notes = Array.isArray(game.notes[index])
+    ? game.notes[index]
+    : [];
 
   if (notes.length > 0) {
     return notes.join("");
   }
 
-  // خانه خالی
   return "·";
 }
 
 // ==========================================
-// جدول اصلی Sudoku
+// کیبورد اصلی Sudoku
 // ==========================================
 
 export function buildSudokuKeyboard(game) {
@@ -38,17 +43,13 @@ export function buildSudokuKeyboard(game) {
       let text =
         getCellText(game, index);
 
-      // مشخص کردن خانه انتخاب‌شده
-      if (
-        game.selectedCell === index
-      ) {
-        text = `【${text}】`;
+      // خانه انتخاب‌شده
+      if (game.selectedCell === index) {
+        text = `🔵${text}`;
       }
 
-      // مشخص کردن خانه‌های اولیه
-      if (
-        game.puzzle[index] !== null
-      ) {
+      // خانه اولیه
+      else if (game.puzzle[index] !== null) {
         text = `🔒${text}`;
       }
 
@@ -64,15 +65,14 @@ export function buildSudokuKeyboard(game) {
   }
 
   // ----------------------------------------
-  // کنترل‌های بازی
+  // کنترل‌های اصلی
   // ----------------------------------------
 
   keyboard.push([
     {
-      text:
-        game.pencilMode
-          ? "✏️ مداد: روشن"
-          : "✏️ مداد: خاموش",
+      text: game.pencilMode
+        ? "✏️ مداد روشن"
+        : "✏️ مداد خاموش",
 
       callback_data:
         "mode:pencil"
@@ -109,23 +109,27 @@ export function buildSudokuKeyboard(game) {
 }
 
 // ==========================================
-// کیبورد اعداد
+// کیبورد انتخاب عدد
 // ==========================================
 
-export function buildNumberKeyboard(
-  game
-) {
+export function buildNumberKeyboard(game) {
   const keyboard = [];
+
+  // ----------------------------------------
+  // اعداد 1 تا 9
+  // ----------------------------------------
 
   keyboard.push([
     {
       text: "1",
       callback_data: "num:1"
     },
+
     {
       text: "2",
       callback_data: "num:2"
     },
+
     {
       text: "3",
       callback_data: "num:3"
@@ -137,10 +141,12 @@ export function buildNumberKeyboard(
       text: "4",
       callback_data: "num:4"
     },
+
     {
       text: "5",
       callback_data: "num:5"
     },
+
     {
       text: "6",
       callback_data: "num:6"
@@ -152,29 +158,43 @@ export function buildNumberKeyboard(
       text: "7",
       callback_data: "num:7"
     },
+
     {
       text: "8",
       callback_data: "num:8"
     },
+
     {
       text: "9",
       callback_data: "num:9"
     }
   ]);
 
+  // ----------------------------------------
+  // کنترل‌ها
+  // ----------------------------------------
+
   keyboard.push([
     {
-      text:
-        game.pencilMode
-          ? "✏️ مداد روشن"
-          : "✏️ مداد خاموش",
+      text: game.pencilMode
+        ? "✏️ مداد روشن"
+        : "✏️ مداد خاموش",
 
       callback_data:
         "mode:pencil"
     },
 
     {
-      text: "⬅️ برگشت",
+      text: "🧹 پاک کردن",
+
+      callback_data:
+        "mode:erase"
+    }
+  ]);
+
+  keyboard.push([
+    {
+      text: "⬅️ برگشت به جدول",
 
       callback_data:
         "action:board"
@@ -188,22 +208,23 @@ export function buildNumberKeyboard(
 }
 
 // ==========================================
-// کیبورد انتخاب درجه سختی
+// کیبورد درجه سختی
 // ==========================================
 
 export function buildDifficultyKeyboard() {
   return {
     inline_keyboard: [
-
       [
         {
           text: "🟢 آسان",
+
           callback_data:
             "difficulty:easy"
         },
 
         {
           text: "🟡 متوسط",
+
           callback_data:
             "difficulty:medium"
         }
@@ -212,12 +233,14 @@ export function buildDifficultyKeyboard() {
       [
         {
           text: "🔴 سخت",
+
           callback_data:
             "difficulty:hard"
         },
 
         {
           text: "🟣 خیلی سخت",
+
           callback_data:
             "difficulty:expert"
         }
@@ -226,6 +249,7 @@ export function buildDifficultyKeyboard() {
       [
         {
           text: "⚫ استاد",
+
           callback_data:
             "difficulty:master"
         }
