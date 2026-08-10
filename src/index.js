@@ -1286,8 +1286,8 @@ export default {
           'Internal Server Error',
         {
           status: 500
-        }
+   }
       );
     }
-                  }
-      
+  }
+};
