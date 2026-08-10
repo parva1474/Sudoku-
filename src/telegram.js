@@ -1,29 +1,23 @@
 // ==========================================
 // src/telegram.js
 // Telegram Bot API
+// Cloudflare Workers
 // ==========================================
 
-const TELEGRAM_API =
-  "https://api.telegram.org/bot";
-
 // ==========================================
-// درخواست عمومی به Telegram API
+// درخواست عمومی به Telegram
 // ==========================================
 
-export async function telegramRequest(
+async function telegramRequest(
   token,
   method,
   body = {}
 ) {
-  if (!token) {
-    throw new Error(
-      "Telegram bot token is missing."
-    );
-  }
+  const url =
+    `https://api.telegram.org/bot${token}/${method}`;
 
-  const response = await fetch(
-    `${TELEGRAM_API}${token}/${method}`,
-    {
+  const response =
+    await fetch(url, {
       method: "POST",
 
       headers: {
@@ -31,26 +25,31 @@ export async function telegramRequest(
           "application/json"
       },
 
-      body: JSON.stringify(body)
-    }
-  );
+      body:
+        JSON.stringify(body)
+    });
 
-  const data =
-    await response.json();
+  let data;
 
-  if (!response.ok || !data.ok) {
-    console.error(
-      "Telegram API Error:",
-      data
-    );
-
+  try {
+    data =
+      await response.json();
+  } catch {
     throw new Error(
-      data.description ||
-      `Telegram API error: ${response.status}`
+      `Telegram returned invalid JSON. HTTP ${response.status}`
     );
   }
 
-  return data;
+  if (!response.ok || !data.ok) {
+    throw new Error(
+      `Telegram API error in ${method}: ${
+        data?.description ||
+        `HTTP ${response.status}`
+      }`
+    );
+  }
+
+  return data.result;
 }
 
 // ==========================================
@@ -64,10 +63,13 @@ export async function sendMessage(
   replyMarkup = null
 ) {
   const body = {
-    chat_id: chatId,
+    chat_id:
+      chatId,
+
     text,
 
-    parse_mode: "HTML",
+    parse_mode:
+      "HTML",
 
     disable_web_page_preview:
       true
@@ -97,13 +99,16 @@ export async function editMessageText(
   replyMarkup = null
 ) {
   const body = {
-    chat_id: chatId,
+    chat_id:
+      chatId,
 
-    message_id: messageId,
+    message_id:
+      messageId,
 
     text,
 
-    parse_mode: "HTML",
+    parse_mode:
+      "HTML",
 
     disable_web_page_preview:
       true
@@ -122,51 +127,26 @@ export async function editMessageText(
 }
 
 // ==========================================
-// ویرایش فقط Keyboard
-// ==========================================
-
-export async function editMessageReplyMarkup(
-  token,
-  chatId,
-  messageId,
-  replyMarkup
-) {
-  return telegramRequest(
-    token,
-    "editMessageReplyMarkup",
-    {
-      chat_id: chatId,
-
-      message_id:
-        messageId,
-
-      reply_markup:
-        replyMarkup
-    }
-  );
-}
-
-// ==========================================
 // پاسخ به Callback Query
 // ==========================================
 
 export async function answerCallbackQuery(
   token,
   callbackQueryId,
-  text = "",
+  text = null,
   showAlert = false
 ) {
   const body = {
     callback_query_id:
-      callbackQueryId
+      callbackQueryId,
+
+    show_alert:
+      showAlert
   };
 
   if (text) {
-    body.text = text;
-  }
-
-  if (showAlert) {
-    body.show_alert = true;
+    body.text =
+      text;
   }
 
   return telegramRequest(
@@ -189,7 +169,8 @@ export async function deleteMessage(
     token,
     "deleteMessage",
     {
-      chat_id: chatId,
+      chat_id:
+        chatId,
 
       message_id:
         messageId
@@ -209,7 +190,8 @@ export async function setWebhook(
     token,
     "setWebhook",
     {
-      url: webhookUrl,
+      url:
+        webhookUrl,
 
       allowed_updates: [
         "message",
@@ -228,7 +210,11 @@ export async function deleteWebhook(
 ) {
   return telegramRequest(
     token,
-    "deleteWebhook"
+    "deleteWebhook",
+    {
+      drop_pending_updates:
+        true
+    }
   );
 }
 
@@ -242,18 +228,5 @@ export async function getWebhookInfo(
   return telegramRequest(
     token,
     "getWebhookInfo"
-  );
-}
-
-// ==========================================
-// دریافت اطلاعات Bot
-// ==========================================
-
-export async function getMe(
-  token
-) {
-  return telegramRequest(
-    token,
-    "getMe"
   );
 }
