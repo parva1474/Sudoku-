@@ -1,11 +1,17 @@
 // ==========================================
 // src/sudokuRenderer.js
 // Renderer استاندارد Sudoku 9×9
+// نسخه اصلاح‌شده برای Telegram
 // ==========================================
 
 const SIZE = 9;
-const CELL_SIZE = 70;
-const GRID_SIZE = SIZE * CELL_SIZE;
+
+// قبلاً 70 بود → 630×630
+// اکنون 60 → 540×540
+const CELL_SIZE = 60;
+
+const GRID_SIZE =
+  SIZE * CELL_SIZE;
 
 
 // ==========================================
@@ -13,6 +19,7 @@ const GRID_SIZE = SIZE * CELL_SIZE;
 // ==========================================
 
 const COLORS = {
+
   background: '#FFFFFF',
 
   cellA: '#FFFFFF',
@@ -59,20 +66,25 @@ function getCellBackground(
   cell
 ) {
 
+  // خانه انتخاب‌شده
   if (
     selectedCell &&
     selectedCell.r === row &&
     selectedCell.c === col
   ) {
+
     return COLORS.selected;
   }
 
 
+  // خانه دارای خطا
   if (cell.isError) {
+
     return '#FFE4E4';
   }
 
 
+  // الگوی 3×3
   const boxRow =
     Math.floor(row / 3);
 
@@ -103,6 +115,7 @@ function renderNotes(
     !Array.isArray(cell.notes) ||
     cell.notes.length === 0
   ) {
+
     return '';
   }
 
@@ -119,24 +132,30 @@ function renderNotes(
     if (
       !cell.notes.includes(number)
     ) {
+
       continue;
     }
 
 
-    const index = number - 1;
+    const index =
+      number - 1;
+
 
     const noteRow =
       Math.floor(index / 3);
+
 
     const noteCol =
       index % 3;
 
 
+    // متناسب با خانه 60×60
     const noteX =
-      x + 12 + noteCol * 23;
+      x + 10 + noteCol * 20;
+
 
     const noteY =
-      y + 16 + noteRow * 22;
+      y + 14 + noteRow * 19;
 
 
     output += `
@@ -144,7 +163,7 @@ function renderNotes(
         x="${noteX}"
         y="${noteY}"
         font-family="Arial, sans-serif"
-        font-size="15"
+        font-size="13"
         text-anchor="middle"
         dominant-baseline="middle"
         fill="${COLORS.notes}"
@@ -171,6 +190,7 @@ function renderCell(
   const x =
     col * CELL_SIZE;
 
+
   const y =
     row * CELL_SIZE;
 
@@ -195,9 +215,9 @@ function renderCell(
   `;
 
 
-  // -----------------------------
-  // انتخاب خانه
-  // -----------------------------
+  // ========================================
+  // کادر خانه انتخاب‌شده
+  // ========================================
 
   if (
     selectedCell &&
@@ -207,23 +227,23 @@ function renderCell(
 
     output += `
       <rect
-        x="${x + 3}"
-        y="${y + 3}"
-        width="${CELL_SIZE - 6}"
-        height="${CELL_SIZE - 6}"
-        rx="5"
-        ry="5"
+        x="${x + 2}"
+        y="${y + 2}"
+        width="${CELL_SIZE - 4}"
+        height="${CELL_SIZE - 4}"
+        rx="4"
+        ry="4"
         fill="none"
         stroke="${COLORS.selectedBorder}"
-        stroke-width="4"
+        stroke-width="3"
       />
     `;
   }
 
 
-  // -----------------------------
+  // ========================================
   // عدد
-  // -----------------------------
+  // ========================================
 
   if (
     cell.value !== null &&
@@ -237,7 +257,9 @@ function renderCell(
 
 
     if (cell.isError) {
-      textColor = COLORS.error;
+
+      textColor =
+        COLORS.error;
     }
 
 
@@ -246,7 +268,7 @@ function renderCell(
         x="${x + CELL_SIZE / 2}"
         y="${y + CELL_SIZE / 2}"
         font-family="Arial, sans-serif"
-        font-size="35"
+        font-size="30"
         font-weight="${cell.given ? '700' : '500'}"
         text-anchor="middle"
         dominant-baseline="middle"
@@ -255,13 +277,14 @@ function renderCell(
     `;
 
 
+    // علامت خطا
     if (cell.isError) {
 
       output += `
         <circle
-          cx="${x + CELL_SIZE - 11}"
-          cy="${y + 11}"
-          r="5"
+          cx="${x + CELL_SIZE - 9}"
+          cy="${y + 9}"
+          r="4"
           fill="${COLORS.error}"
         />
       `;
@@ -269,6 +292,7 @@ function renderCell(
 
   } else {
 
+    // یادداشت‌ها
     output +=
       renderNotes(
         cell,
@@ -301,7 +325,6 @@ function renderThinGrid() {
       i * CELL_SIZE;
 
 
-    // فقط خطوط داخلی
     output += `
       <line
         x1="${position}"
@@ -337,7 +360,6 @@ function renderBoxLines() {
   let output = '';
 
 
-  // خطوط داخلی بلوک‌ها
   const positions = [
     3 * CELL_SIZE,
     6 * CELL_SIZE
@@ -356,7 +378,7 @@ function renderBoxLines() {
         x2="${position}"
         y2="${GRID_SIZE}"
         stroke="${COLORS.gridThick}"
-        stroke-width="5"
+        stroke-width="4"
       />
     `;
 
@@ -369,7 +391,7 @@ function renderBoxLines() {
         x2="${GRID_SIZE}"
         y2="${position}"
         stroke="${COLORS.gridThick}"
-        stroke-width="5"
+        stroke-width="4"
       />
     `;
   }
@@ -387,13 +409,13 @@ function renderOuterBorder() {
 
   return `
     <rect
-      x="2.5"
-      y="2.5"
-      width="${GRID_SIZE - 5}"
-      height="${GRID_SIZE - 5}"
+      x="2"
+      y="2"
+      width="${GRID_SIZE - 4}"
+      height="${GRID_SIZE - 4}"
       fill="none"
       stroke="${COLORS.gridThick}"
-      stroke-width="5"
+      stroke-width="4"
     />
   `;
 }
@@ -408,9 +430,9 @@ export function renderSudokuSVG(
   selectedCell = null
 ) {
 
-  // -----------------------------
+  // ========================================
   // بررسی ساختار
-  // -----------------------------
+  // ========================================
 
   if (
     !gameState ||
@@ -444,9 +466,9 @@ export function renderSudokuSVG(
   }
 
 
-  // -----------------------------
+  // ========================================
   // ساخت 81 خانه
-  // -----------------------------
+  // ========================================
 
   let cells = '';
 
@@ -474,9 +496,9 @@ export function renderSudokuSVG(
   }
 
 
-  // -----------------------------
+  // ========================================
   // SVG نهایی
-  // -----------------------------
+  // ========================================
 
   return `
 <svg
@@ -504,4 +526,4 @@ export function renderSudokuSVG(
 
 </svg>
 `;
-}
+      }
