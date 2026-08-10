@@ -1409,3 +1409,4 @@ async function loadGame(
         row.created_at
       )
   }
+}
