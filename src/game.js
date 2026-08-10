@@ -1,22 +1,27 @@
 // ==========================================
 // src/game.js
-// منطق بازی Sudoku
+// منطق کامل بازی Sudoku
 // ==========================================
 
 import {
   createPuzzle,
   isValidMove,
   isSolved,
-  getCandidates
+  getCandidates,
+  extractHintMove
 } from "./sudoku.js";
 
 // ==========================================
 // ساخت بازی جدید
 // ==========================================
 
-export function newGame(difficulty = "medium") {
-  const { puzzle, solution } =
-    createPuzzle(difficulty);
+export function newGame(
+  difficulty = "medium"
+) {
+  const {
+    puzzle,
+    solution
+  } = createPuzzle(difficulty);
 
   return {
     puzzle: [...puzzle],
@@ -50,7 +55,10 @@ export function newGame(difficulty = "medium") {
 // انتخاب خانه
 // ==========================================
 
-export function selectCell(game, index) {
+export function selectCell(
+  game,
+  index
+) {
   if (
     !Number.isInteger(index) ||
     index < 0 ||
@@ -65,10 +73,12 @@ export function selectCell(game, index) {
 }
 
 // ==========================================
-// تغییر حالت مداد
+// روشن/خاموش کردن Pencil
 // ==========================================
 
-export function togglePencilMode(game) {
+export function togglePencilMode(
+  game
+) {
   game.pencilMode =
     !game.pencilMode;
 
@@ -76,7 +86,7 @@ export function togglePencilMode(game) {
 }
 
 // ==========================================
-// بررسی اینکه خانه قابل ویرایش است یا نه
+// آیا خانه قابل ویرایش است؟
 // ==========================================
 
 export function isEditableCell(
@@ -84,120 +94,28 @@ export function isEditableCell(
   index
 ) {
   if (
+    !Number.isInteger(index) ||
     index < 0 ||
     index >= 81
   ) {
     return false;
   }
 
-  // خانه‌ای که از ابتدا پر بوده
-  if (
-    game.puzzle[index] !== null
-  ) {
-    return false;
-  }
+  /*
+   * خانه‌ای که در Puzzle اولیه
+   * عدد داشته باشد قفل است.
+   */
 
-  return true;
+  return (
+    game.puzzle[index] === null
+  );
 }
 
 // ==========================================
-// افزودن / حذف Pencil
+// Pencil
 // ==========================================
 
 export function toggleNote(
-  game,
-  index,
-  number
-) {
-  if (
-    !isEditableCell(game, index)
-  ) {
-    return {
-      ok: false,
-      message: "این خانه قابل ویرایش نیست."
-    };
-  }
-
-  if (
-    game.board[index] !== null
-  ) {
-    return {
-      ok: false,
-      message: "این خانه عدد دارد."
-    };
-  }
-
-  if (
-    !Number.isInteger(number) ||
-    number < 1 ||
-    number > 9
-  ) {
-    return {
-      ok: false,
-      message: "عدد نامعتبر است."
-    };
-  }
-
-  const candidates =
-    getCandidates(
-      game.board,
-      index
-    );
-
-  /*
-   * اگر عدد از نظر قوانین Sudoku
-   * اصلاً امکان‌پذیر نباشد،
-   * داخل مداد قرار نمی‌گیرد.
-   */
-
-  if (
-    !candidates.includes(number)
-  ) {
-    return {
-      ok: false,
-      message:
-        `عدد ${number} در این خانه امکان‌پذیر نیست.`
-    };
-  }
-
-  const notes =
-    game.notes[index];
-
-  const position =
-    notes.indexOf(number);
-
-  if (position === -1) {
-
-    notes.push(number);
-
-    notes.sort(
-      (a, b) => a - b
-    );
-
-    return {
-      ok: true,
-      added: true
-    };
-
-  } else {
-
-    notes.splice(
-      position,
-      1
-    );
-
-    return {
-      ok: true,
-      added: false
-    };
-  }
-}
-
-// ==========================================
-// قرار دادن عدد واقعی
-// ==========================================
-
-export function putNumber(
   game,
   index,
   number
@@ -207,7 +125,8 @@ export function putNumber(
   ) {
     return {
       ok: false,
-      message: "این بازی تمام شده است."
+      message:
+        "این بازی تمام شده است."
     };
   }
 
@@ -220,7 +139,7 @@ export function putNumber(
     return {
       ok: false,
       message:
-        "این خانه از ابتدا پر بوده و قابل تغییر نیست."
+        "این خانه قابل ویرایش نیست."
     };
   }
 
@@ -231,14 +150,132 @@ export function putNumber(
   ) {
     return {
       ok: false,
-      message: "عدد نامعتبر است."
+      message:
+        "عدد نامعتبر است."
     };
   }
 
   /*
-   * اگر عدد اشتباه باشد:
-   * عدد وارد جدول نمی‌شود.
-   * فقط تعداد اشتباهات افزایش می‌یابد.
+   * اگر خانه خودش عدد داشته باشد،
+   * Pencil معنی ندارد.
+   */
+
+  if (
+    game.board[index] !== null
+  ) {
+    return {
+      ok: false,
+      message:
+        "ابتدا عدد خانه را پاک کن."
+    };
+  }
+
+  /*
+   * فقط عددهای منطقی را اجازه می‌دهیم.
+   */
+
+  const candidates =
+    getCandidates(
+      game.board,
+      index
+    );
+
+  if (
+    !candidates.includes(number)
+  ) {
+    return {
+      ok: false,
+      message:
+        `❌ عدد ${number} در این خانه امکان‌پذیر نیست.`
+    };
+  }
+
+  if (
+    !Array.isArray(
+      game.notes[index]
+    )
+  ) {
+    game.notes[index] = [];
+  }
+
+  const position =
+    game.notes[index].indexOf(
+      number
+    );
+
+  if (position === -1) {
+
+    game.notes[index].push(
+      number
+    );
+
+    game.notes[index].sort(
+      (a, b) => a - b
+    );
+
+    return {
+      ok: true,
+      added: true
+    };
+  }
+
+  game.notes[index].splice(
+    position,
+    1
+  );
+
+  return {
+    ok: true,
+    added: false
+  };
+}
+
+// ==========================================
+// قرار دادن عدد
+// ==========================================
+
+export function putNumber(
+  game,
+  index,
+  number
+) {
+  if (
+    game.status !== "playing"
+  ) {
+    return {
+      ok: false,
+      message:
+        "این بازی تمام شده است."
+    };
+  }
+
+  if (
+    !isEditableCell(
+      game,
+      index
+    )
+  ) {
+    return {
+      ok: false,
+      message:
+        "این خانه قابل تغییر نیست."
+    };
+  }
+
+  if (
+    !Number.isInteger(number) ||
+    number < 1 ||
+    number > 9
+  ) {
+    return {
+      ok: false,
+      message:
+        "عدد نامعتبر است."
+    };
+  }
+
+  /*
+   * عدد باید با Solution مطابقت داشته باشد.
    */
 
   if (
@@ -253,29 +290,41 @@ export function putNumber(
 
     return {
       ok: false,
+
       mistake: true,
+
       message:
-        `❌ عدد ${number} برای این خانه صحیح نیست.`,
+        `❌ عدد ${number} اشتباه است.`,
+
       mistakes:
         game.mistakes
     };
   }
 
+  // ----------------------------------------
   // عدد صحیح
+  // ----------------------------------------
+
   game.board[index] =
     number;
 
-  // Pencilهای همان خانه پاک شوند
+  // Pencilهای همان خانه پاک شوند.
+
   game.notes[index] = [];
 
-  // این عدد از Pencil خانه‌های مرتبط حذف شود
+  // عدد قرار داده‌شده را از
+  // Pencil خانه‌های مرتبط حذف کن.
+
   removeNumberFromRelatedNotes(
     game,
     index,
     number
   );
 
-  // بررسی برد
+  // ----------------------------------------
+  // بررسی پایان بازی
+  // ----------------------------------------
+
   if (
     isSolved(
       game.board,
@@ -287,9 +336,12 @@ export function putNumber(
 
     return {
       ok: true,
+
       won: true,
+
       message:
-        "🎉 تبریک! Sudoku را کامل حل کردی.",
+        "🎉 تبریک! Sudoku حل شد.",
+
       mistakes:
         game.mistakes
     };
@@ -297,20 +349,32 @@ export function putNumber(
 
   return {
     ok: true,
+
     won: false,
+
     mistakes:
       game.mistakes
   };
 }
 
 // ==========================================
-// پاک کردن عدد یک خانه
+// پاک کردن عدد
 // ==========================================
 
 export function eraseNumber(
   game,
   index
 ) {
+  if (
+    game.status !== "playing"
+  ) {
+    return {
+      ok: false,
+      message:
+        "این بازی تمام شده است."
+    };
+  }
+
   if (
     !isEditableCell(
       game,
@@ -324,13 +388,17 @@ export function eraseNumber(
     };
   }
 
+  /*
+   * اگر خالی است، کاری نکن.
+   */
+
   if (
     game.board[index] === null
   ) {
     return {
       ok: false,
       message:
-        "این خانه خالی است."
+        "این خانه از قبل خالی است."
     };
   }
 
@@ -343,7 +411,7 @@ export function eraseNumber(
 }
 
 // ==========================================
-// حذف یک عدد از Pencilهای مرتبط
+// پاک کردن Pencilهای مرتبط
 // ==========================================
 
 function removeNumberFromRelatedNotes(
@@ -369,6 +437,12 @@ function removeNumberFromRelatedNotes(
     i++
   ) {
 
+    if (
+      i === index
+    ) {
+      continue;
+    }
+
     const r =
       Math.floor(i / 9);
 
@@ -393,17 +467,24 @@ function removeNumberFromRelatedNotes(
       sameBox
     ) {
 
-      game.notes[i] =
-        game.notes[i].filter(
-          value =>
-            value !== number
-        );
+      if (
+        Array.isArray(
+          game.notes[i]
+        )
+      ) {
+
+        game.notes[i] =
+          game.notes[i].filter(
+            value =>
+              value !== number
+          );
+      }
     }
   }
 }
 
 // ==========================================
-// دریافت اطلاعات خانه
+// دریافت اطلاعات یک خانه
 // ==========================================
 
 export function getCellInfo(
@@ -411,6 +492,7 @@ export function getCellInfo(
   index
 ) {
   if (
+    !Number.isInteger(index) ||
     index < 0 ||
     index >= 81
   ) {
@@ -424,7 +506,11 @@ export function getCellInfo(
       game.board[index],
 
     notes:
-      [...game.notes[index]],
+      Array.isArray(
+        game.notes[index]
+      )
+        ? [...game.notes[index]]
+        : [],
 
     fixed:
       game.puzzle[index] !== null,
@@ -441,7 +527,7 @@ export function getCellInfo(
 }
 
 // ==========================================
-// تعداد خانه‌های حل‌شده
+// تعداد خانه‌های پر
 // ==========================================
 
 export function getSolvedCount(
@@ -475,7 +561,201 @@ export function getProgress(
   const count =
     getSolvedCount(game);
 
+  /*
+   * فقط خانه‌های خالی اولیه را
+   * معیار پیشرفت قرار می‌دهیم.
+   */
+
+  let totalEmpty = 0;
+
+  for (
+    let i = 0;
+    i < 81;
+    i++
+  ) {
+
+    if (
+      game.puzzle[i] === null
+    ) {
+      totalEmpty++;
+    }
+  }
+
+  if (
+    totalEmpty === 0
+  ) {
+    return 100;
+  }
+
+  let solvedEmpty = 0;
+
+  for (
+    let i = 0;
+    i < 81;
+    i++
+  ) {
+
+    if (
+      game.puzzle[i] === null &&
+      game.board[i] !== null
+    ) {
+      solvedEmpty++;
+    }
+  }
+
   return Math.round(
-    (count / 81) * 100
+    (solvedEmpty / totalEmpty) * 100
   );
 }
+
+// ==========================================
+// Hint
+// ==========================================
+
+export function applyHint(
+  game,
+  hintResult
+) {
+  if (
+    game.status !== "playing"
+  ) {
+    return {
+      ok: false,
+      message:
+        "این بازی تمام شده است."
+    };
+  }
+
+  const move =
+    extractHintMove(
+      hintResult
+    );
+
+  /*
+   * اگر کتابخانه حرکت مشخصی
+   * برنگرداند، از Solution خودمان
+   * برای پیدا کردن اولین خانه خالی
+   * استفاده می‌کنیم.
+   */
+
+  let index = null;
+  let value = null;
+
+  if (
+    move &&
+    Number.isInteger(
+      move.index
+    ) &&
+    Number.isInteger(
+      move.value
+    )
+  ) {
+
+    index =
+      move.index;
+
+    value =
+      move.value;
+
+  } else {
+
+    for (
+      let i = 0;
+      i < 81;
+      i++
+    ) {
+
+      if (
+        game.board[i] === null &&
+        game.solution[i] !== null
+      ) {
+
+        index = i;
+
+        value =
+          game.solution[i];
+
+        break;
+      }
+    }
+  }
+
+  if (
+    index === null ||
+    value === null
+  ) {
+
+    return {
+      ok: false,
+      message:
+        "💡 راهنمایی مناسبی پیدا نشد."
+    };
+  }
+
+  /*
+   * خانه باید قابل ویرایش باشد.
+   */
+
+  if (
+    !isEditableCell(
+      game,
+      index
+    )
+  ) {
+
+    return {
+      ok: false,
+      message:
+        "💡 خانه مناسبی برای راهنمایی پیدا نشد."
+    };
+  }
+
+  game.board[index] =
+    value;
+
+  game.notes[index] = [];
+
+  removeNumberFromRelatedNotes(
+    game,
+    index,
+    value
+  );
+
+  game.hints++;
+
+  if (
+    isSolved(
+      game.board,
+      game.solution
+    )
+  ) {
+
+    game.status = "won";
+
+    return {
+      ok: true,
+
+      won: true,
+
+      index,
+
+      value,
+
+      message:
+        `💡 راهنمایی: عدد ${value} در خانه ${index + 1} قرار گرفت.\n\n🎉 جدول هم کامل شد.`
+    };
+  }
+
+  return {
+    ok: true,
+
+    won: false,
+
+    index,
+
+    value,
+
+    message:
+      `💡 راهنمایی: عدد ${value} در خانه ${index + 1} قرار گرفت.`
+  };
+    }
