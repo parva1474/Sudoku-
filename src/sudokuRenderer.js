@@ -1,15 +1,12 @@
 // ==========================================
 // src/sudokuRenderer.js
-// Renderer اصلاح‌شده برای Sudoku 9×9
+// نسخه پایدار و اصلاح‌شده برای رفع مشکل برش تصویر
 // ==========================================
 
 const SIZE = 9;
 const CELL_SIZE = 60;
-const GRID_SIZE = SIZE * CELL_SIZE;
+const GRID_SIZE = SIZE * CELL_SIZE; // 540
 
-// ==========================================
-// رنگ‌ها
-// ==========================================
 const COLORS = {
   background: '#FFFFFF',
   cellA: '#FFFFFF',
@@ -51,7 +48,7 @@ function renderNotes(cell, x, y) {
     const noteCol = index % 3;
     const noteX = x + 10 + noteCol * 20;
     const noteY = y + 14 + noteRow * 19;
-    output += `<text x="${noteX}" y="${noteY}" font-family="Arial, sans-serif" font-size="13" text-anchor="middle" dominant-baseline="middle" fill="${COLORS.notes}">${number}</text>`;
+    output += `<text x="${noteX}" y="${noteY}" font-family="Arial" font-size="13" text-anchor="middle" dominant-baseline="middle" fill="${COLORS.notes}">${number}</text>`;
   }
   return output;
 }
@@ -70,7 +67,7 @@ function renderCell(row, col, cell, selectedCell) {
   if (cell.value !== null && cell.value !== undefined) {
     let textColor = cell.given ? COLORS.given : COLORS.user;
     if (cell.isError) textColor = COLORS.error;
-    output += `<text x="${x + CELL_SIZE / 2}" y="${y + CELL_SIZE / 2}" font-family="Arial, sans-serif" font-size="30" font-weight="${cell.given ? '700' : '500'}" text-anchor="middle" dominant-baseline="middle" fill="${textColor}">${escapeXml(cell.value)}</text>`;
+    output += `<text x="${x + CELL_SIZE / 2}" y="${y + CELL_SIZE / 2}" font-family="Arial" font-size="30" font-weight="${cell.given ? '700' : '500'}" text-anchor="middle" dominant-baseline="middle" fill="${textColor}">${escapeXml(cell.value)}</text>`;
     if (cell.isError) output += `<circle cx="${x + CELL_SIZE - 9}" cy="${y + 9}" r="4" fill="${COLORS.error}" />`;
   } else {
     output += renderNotes(cell, x, y);
@@ -81,32 +78,28 @@ function renderCell(row, col, cell, selectedCell) {
 function renderThinGrid() {
   let output = '';
   for (let i = 1; i < SIZE; i++) {
-    const position = i * CELL_SIZE;
-    output += `<line x1="${position}" y1="0" x2="${position}" y2="${GRID_SIZE}" stroke="${COLORS.gridThin}" stroke-width="1" />
-               <line x1="0" y1="${position}" x2="${GRID_SIZE}" y2="${position}" stroke="${COLORS.gridThin}" stroke-width="1" />`;
+    const pos = i * CELL_SIZE;
+    output += `<line x1="${pos}" y1="0" x2="${pos}" y2="${GRID_SIZE}" stroke="${COLORS.gridThin}" stroke-width="1" />
+               <line x1="0" y1="${pos}" x2="${GRID_SIZE}" y2="${pos}" stroke="${COLORS.gridThin}" stroke-width="1" />`;
   }
   return output;
 }
 
 function renderBoxLines() {
   let output = '';
-  const positions = [3 * CELL_SIZE, 6 * CELL_SIZE];
-  for (const position of positions) {
-    output += `<line x1="${position}" y1="0" x2="${position}" y2="${GRID_SIZE}" stroke="${COLORS.gridThick}" stroke-width="4" />
-               <line x1="0" y1="${position}" x2="${GRID_SIZE}" y2="${position}" stroke="${COLORS.gridThick}" stroke-width="4" />`;
+  const pos = [3 * CELL_SIZE, 6 * CELL_SIZE];
+  for (const p of pos) {
+    output += `<line x1="${p}" y1="0" x2="${p}" y2="${GRID_SIZE}" stroke="${COLORS.gridThick}" stroke-width="4" />
+               <line x1="0" y1="${p}" x2="${GRID_SIZE}" y2="${p}" stroke="${COLORS.gridThick}" stroke-width="4" />`;
   }
   return output;
 }
 
 function renderOuterBorder() {
-  return `<rect x="2" y="2" width="${GRID_SIZE - 4}" height="${GRID_SIZE - 4}" fill="none" stroke="${COLORS.gridThick}" stroke-width="4" />`;
+  return `<rect x="0" y="0" width="${GRID_SIZE}" height="${GRID_SIZE}" fill="none" stroke="${COLORS.gridThick}" stroke-width="4" />`;
 }
 
 export function renderSudokuSVG(gameState, selectedCell = null) {
-  if (!gameState || !Array.isArray(gameState.board) || gameState.board.length !== 9) {
-    throw new Error('❌ جدول Sudoku باید دقیقاً 9 ردیف داشته باشد.');
-  }
-
   let cells = '';
   for (let row = 0; row < 9; row++) {
     for (let col = 0; col < 9; col++) {
@@ -114,18 +107,13 @@ export function renderSudokuSVG(gameState, selectedCell = null) {
     }
   }
 
-  // اضافه کردن Padding برای جلوگیری از بریدگی در حاشیه
-  const padding = 4;
-  const totalSize = GRID_SIZE + (padding * 2);
-
+  // مستقیماً ابعاد را ست می‌کنیم بدون viewBox تا در رندر مشکلی پیش نیاید
   return `
-<svg xmlns="http://www.w3.org/2000/svg" width="${totalSize}" height="${totalSize}" viewBox="0 0 ${totalSize} ${totalSize}">
-  <g transform="translate(${padding}, ${padding})">
+<svg xmlns="http://www.w3.org/2000/svg" width="${GRID_SIZE}" height="${GRID_SIZE}">
     <rect x="0" y="0" width="${GRID_SIZE}" height="${GRID_SIZE}" fill="${COLORS.background}" />
     ${cells}
     ${renderThinGrid()}
     ${renderBoxLines()}
     ${renderOuterBorder()}
-  </g>
 </svg>`;
 }
