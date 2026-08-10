@@ -1,107 +1,132 @@
 // ==========================================
-// utils.js
+// src/utils.js
 // کیبورد کنترل سودوکو
 // ==========================================
 
-/**
- * ساخت کیبورد کنترل بازی سودوکو
- *
- * selectedCell:
- * {
- *   r: number,
- *   c: number
- * }
- *
- * scoresMap:
- * Map<userId, {
- *   name: string,
- *   score: number,
- *   mistakes: number
- * }>
- */
 export function buildControlKeyboard(
   gameState,
   selectedCell = null,
   scoresMap = null
 ) {
+
   const keyboard = [];
 
   // ==========================================
   // جدول امتیازات
   // ==========================================
 
-  if (scoresMap && scoresMap.size > 0) {
-    let scoreText = "🏆 جدول امتیازات گروه:\n";
+  if (
+    scoresMap &&
+    scoresMap.size > 0
+  ) {
 
-    let players = Array.from(scoresMap.values());
+    let scoreText =
+      "🏆 جدول امتیازات:\n";
 
-    // بیشترین امتیاز اول
-    players.sort((a, b) => b.score - a.score);
+    const players =
+      Array.from(
+        scoresMap.values()
+      ).sort(
+        (a, b) =>
+          b.score - a.score
+      );
 
-    players.forEach((stats, index) => {
-      const rank =
-        index === 0 ? "🥇" :
-        index === 1 ? "🥈" :
-        index === 2 ? "🥉" :
-        `${index + 1}.`;
+    players.forEach(
+      (stats, index) => {
 
-      scoreText +=
-        `${rank} ${stats.name} | ` +
-        `⭐ ${stats.score} | ` +
-        `❌ ${stats.mistakes}/3\n`;
-    });
+        const rank =
+          index === 0
+            ? "🥇"
+            : index === 1
+              ? "🥈"
+              : index === 2
+                ? "🥉"
+                : `${index + 1}.`;
+
+        scoreText +=
+          `${rank} ${stats.name} | ` +
+          `⭐ ${stats.score} | ` +
+          `❌ ${stats.mistakes}/3\n`;
+      }
+    );
 
     keyboard.push([
       {
-        text: scoreText.trim(),
-        callback_data: "noop"
+        text:
+          scoreText.trim(),
+        callback_data:
+          "noop"
       }
     ]);
   }
 
   // ==========================================
-  // کنترل اعداد
+  // وضعیت خانه انتخاب‌شده
   // ==========================================
 
-  if (
-    selectedCell &&
-    gameState &&
-    gameState.status === "PLAYING"
-  ) {
+  if (selectedCell) {
 
-    const selected = gameState.board[selectedCell.r]?.[selectedCell.c];
+    const selected =
+      gameState
+        ?.board?.[
+          selectedCell.r
+        ]?.[
+          selectedCell.c
+        ];
 
-    // نمایش وضعیت خانه انتخاب‌شده
     if (selected) {
-      let cellInfo = "📍 خانه انتخاب‌شده";
+
+      let text =
+        `📍 خانه ${selectedCell.r + 1}،${selectedCell.c + 1}`;
 
       if (selected.given) {
-        cellInfo += " | 🔒 ثابت";
-      } else if (selected.value !== null) {
-        cellInfo += ` | 🔢 ${selected.value}`;
+
+        text +=
+          ` | 🔒 ${selected.value}`;
+
+      } else if (
+        selected.value !== null &&
+        selected.value !== undefined
+      ) {
+
+        text +=
+          ` | 🔢 ${selected.value}`;
+
       } else {
-        cellInfo += " | ⬜ خالی";
+
+        text +=
+          " | ⬜ خالی";
       }
 
       keyboard.push([
         {
-          text: cellInfo,
-          callback_data: "noop"
+          text,
+          callback_data:
+            "noop"
         }
       ]);
     }
 
-    // حالت مداد
+    // ========================================
+    // مداد
+    // ========================================
+
     keyboard.push([
       {
-        text: gameState.pencilMode
-          ? "✏️ حالت مداد: روشن"
-          : "✏️ حالت مداد: خاموش",
-        callback_data: "toggle_pencil"
+        text:
+          gameState.pencilMode
+            ? "✏️ مداد: روشن"
+            : "✏️ مداد: خاموش",
+
+        callback_data:
+          "toggle_pencil"
       }
     ]);
 
-    // اعداد 1 تا 3
+    // ========================================
+    // اعداد
+    // ========================================
+
     keyboard.push([
       {
         text: "1️⃣",
@@ -117,7 +142,6 @@ export function buildControlKeyboard(
       }
     ]);
 
-    // اعداد 4 تا 6
     keyboard.push([
       {
         text: "4️⃣",
@@ -133,7 +157,6 @@ export function buildControlKeyboard(
       }
     ]);
 
-    // اعداد 7 تا 9
     keyboard.push([
       {
         text: "7️⃣",
@@ -149,15 +172,20 @@ export function buildControlKeyboard(
       }
     ]);
 
-    // پاک کردن / لغو انتخاب
     keyboard.push([
       {
-        text: "🧹 پاک کردن",
-        callback_data: "input_0"
+        text:
+          "🧹 پاک کردن",
+
+        callback_data:
+          "input_0"
       },
       {
-        text: "❌ لغو انتخاب",
-        callback_data: "deselect"
+        text:
+          "❌ لغو انتخاب",
+
+        callback_data:
+          "deselect"
       }
     ]);
 
@@ -165,83 +193,118 @@ export function buildControlKeyboard(
 
     keyboard.push([
       {
-        text: "👇 ابتدا یک خانه را از جدول انتخاب کنید",
-        callback_data: "noop"
+        text:
+          "👇 ابتدا یک خانه از جدول انتخاب کنید",
+
+        callback_data:
+          "noop"
       }
     ]);
   }
 
   // ==========================================
-  // گرید 9×9
+  // جدول 9×9
   // ==========================================
 
-  const grid = [];
-
-  for (let r = 0; r < 9; r++) {
+  for (
+    let r = 0;
+    r < 9;
+    r++
+  ) {
 
     const row = [];
 
-    for (let c = 0; c < 9; c++) {
+    for (
+      let c = 0;
+      c < 9;
+      c++
+    ) {
 
-      const cell = gameState.board[r][c];
+      const cell =
+        gameState.board[r][c];
 
-      let label = "·";
+      let label =
+        "·";
 
-      // عدد موجود
-      if (cell.value !== null) {
+      if (
+        cell.value !== null &&
+        cell.value !== undefined
+      ) {
 
-        // خانه‌های ثابت
         if (cell.given) {
-          label = `🔒${cell.value}`;
-        }
 
-        // خانه‌ای که کاربر وارد کرده
-        else if (cell.isError) {
-          label = `❌${cell.value}`;
-        }
+          label =
+            `🔒${cell.value}`;
 
-        else {
-          label = `${cell.value}`;
+        } else if (
+          cell.isError
+        ) {
+
+          label =
+            `❌${cell.value}`;
+
+        } else {
+
+          label =
+            String(cell.value);
         }
       }
 
-      // خانه انتخاب شده
+      // ======================================
+      // خانه انتخاب‌شده
+      // ======================================
+
       if (
         selectedCell &&
         selectedCell.r === r &&
         selectedCell.c === c
       ) {
-        label = "📍";
+
+        label =
+          cell.value !== null &&
+          cell.value !== undefined
+            ? `🔵${cell.value}`
+            : "🔵";
       }
 
       row.push({
-        text: label,
-        callback_data: `cell_${r}_${c}`
+        text:
+          label,
+
+        callback_data:
+          `cell_${r}_${c}`
       });
     }
 
-    grid.push(row);
+    keyboard.push(row);
   }
 
-  // اضافه کردن گرید به کیبورد
-  keyboard.push(...grid);
-
   // ==========================================
-  // کنترل‌های پایین
+  // پایین جدول
   // ==========================================
 
   keyboard.push([
     {
-      text: "🔄 بازی جدید",
-      callback_data: "new_game"
+      text:
+        "🔄 بازی جدید",
+
+      callback_data:
+        "new_game"
     },
+
     {
-      text: `🎮 ${gameState.status}`,
-      callback_data: "noop"
+      text:
+        gameState.status === "COMPLETED"
+          ? "🏆 تمام شد"
+          : "🎮 در حال بازی",
+
+      callback_data:
+        "noop"
     }
   ]);
 
   return {
-    inline_keyboard: keyboard
+    inline_keyboard:
+      keyboard
   };
 }
