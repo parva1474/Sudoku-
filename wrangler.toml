@@ -1,3 +1,13 @@
-name = "sudoku"
-main = "src/index.js"
-compatibility_date = "2026-08-08"
+{
+  "name": "telegram-sudoku",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-08-10",
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "sudoku-db",
+      "database_id": "PUT_YOUR_D1_DATABASE_ID_HERE"
+    }
+  ]
+}
