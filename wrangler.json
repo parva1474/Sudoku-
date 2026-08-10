@@ -7,7 +7,7 @@
     {
       "binding": "DB",
       "database_name": "sudoku-db",
-      "database_id": "PUT_YOUR_D1_DATABASE_ID_HERE"
+      "database_id": "de674f38-d332-4710-b58f-378ce00dadfd"
     }
   ]
 }
