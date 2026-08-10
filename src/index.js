@@ -126,10 +126,7 @@ async function checkUserMembership(
 
 function getSessionKey(cq) {
 
-  // -------------------------------
   // پیام معمولی
-  // -------------------------------
-
   if (cq.message) {
 
     return (
@@ -138,11 +135,7 @@ function getSessionKey(cq) {
     );
   }
 
-
-  // -------------------------------
   // پیام Inline
-  // -------------------------------
-
   if (cq.inline_message_id) {
 
     return (
@@ -150,7 +143,6 @@ function getSessionKey(cq) {
       String(cq.inline_message_id)
     );
   }
-
 
   return null;
 }
@@ -275,10 +267,6 @@ async function updateGameMessage(
     );
 
 
-  // --------------------------------------
-  // پیام معمولی
-  // --------------------------------------
-
   if (cq.message) {
 
     return updateSudokuPhoto(
@@ -290,10 +278,6 @@ async function updateGameMessage(
     );
   }
 
-
-  // --------------------------------------
-  // پیام Inline
-  // --------------------------------------
 
   if (cq.inline_message_id) {
 
@@ -341,10 +325,6 @@ export default {
     }
 
 
-    // ======================================
-    // GET
-    // ======================================
-
     if (
       request.method !== 'POST'
     ) {
@@ -361,12 +341,6 @@ export default {
         await request.json();
 
 
-      console.log(
-        'UPDATE TYPE:',
-        Object.keys(update)
-      );
-
-
       // ====================================
       // /start
       // ====================================
@@ -378,7 +352,6 @@ export default {
 
         const message =
           update.message;
-
 
         const text =
           message.text.trim();
@@ -392,14 +365,9 @@ export default {
           const chatId =
             message.chat.id;
 
-
           const userId =
             message.from.id;
 
-
-          // -------------------------------
-          // عضویت
-          // -------------------------------
 
           const isMember =
             await checkUserMembership(
@@ -425,13 +393,8 @@ export default {
           }
 
 
-          // -------------------------------
-          // بازی جدید
-          // -------------------------------
-
           const gameState =
             generateNewGame();
-
 
           const sessionKey =
             `chat_${chatId}`;
@@ -442,12 +405,10 @@ export default {
             gameState
           );
 
-
           selectedCellsMap.set(
             sessionKey,
             null
           );
-
 
           userScoresMap.set(
             sessionKey,
@@ -455,43 +416,25 @@ export default {
           );
 
 
-          // -------------------------------
-          // ساخت تصویر
-          // -------------------------------
-
           const svg =
             renderSudokuSVG(
               gameState,
               null
             );
 
-
           const keyboard =
             buildControlKeyboard(
               gameState,
               null,
-              userScoresMap.get(
-                sessionKey
-              )
+              userScoresMap.get(sessionKey)
             );
 
 
-          // -------------------------------
-          // ارسال فقط یک عکس
-          // -------------------------------
-
-          const result =
-            await sendSudokuPhoto(
-              BOT_TOKEN,
-              chatId,
-              svg,
-              keyboard
-            );
-
-
-          console.log(
-            'SEND PHOTO RESULT:',
-            JSON.stringify(result)
+          await sendSudokuPhoto(
+            BOT_TOKEN,
+            chatId,
+            svg,
+            keyboard
           );
 
 
@@ -511,7 +454,6 @@ export default {
         const inlineQuery =
           update.inline_query;
 
-
         const queryId =
           inlineQuery.id;
 
@@ -519,11 +461,10 @@ export default {
         const gameState =
           generateNewGame();
 
-
-        // --------------------------------
-        // فعلاً با queryId ذخیره می‌کنیم
-        // --------------------------------
-
+        // نکته مهم: برای اینکه بعد از ارسال اینلاین، کلید سشن با inline_message_id هماهنگ شود
+        // ما از یک کلید موقت استفاده می‌کنیم یا بازی را ثبت می‌کنیم.
+        // در تلگرام وقتی پیام اینلاین ارسال می‌شود، در اولین کلیک، inline_message_id به دست می‌آید.
+        // برای حل این مسئله، بازی را با queryId هم ذخیره می‌کنیم تا در اولین کالبک قابل بازیابی باشد.
         const temporaryKey =
           `inline_query_${queryId}`;
 
@@ -533,12 +474,10 @@ export default {
           gameState
         );
 
-
         selectedCellsMap.set(
           temporaryKey,
           null
         );
-
 
         userScoresMap.set(
           temporaryKey,
@@ -550,27 +489,22 @@ export default {
           buildControlKeyboard(
             gameState,
             null,
-            userScoresMap.get(
-              temporaryKey
-            )
+            userScoresMap.get(temporaryKey)
           );
 
 
         const results = [
           {
-
             type: 'article',
 
             id:
-              `sudoku_${Date.now()}_${Math.random()
-                .toString(36)
-                .slice(2)}`,
+              `sudoku_${Date.now()}_${Math.random().toString(36).slice(2)}`,
 
             title:
               '🧩 شروع بازی گروهی سودوکو',
 
             description:
-              'ارسال بازی سودوکو',
+              'ارسال بازی سودوکو به گروه',
 
             input_message_content: {
 
@@ -588,41 +522,29 @@ export default {
         ];
 
 
-        const inlineResponse =
-          await fetch(
-            `https://api.telegram.org/bot${BOT_TOKEN}/answerInlineQuery`,
-            {
-              method: 'POST',
+        await fetch(
+          `https://api.telegram.org/bot${BOT_TOKEN}/answerInlineQuery`,
+          {
+            method: 'POST',
 
-              headers: {
-                'Content-Type':
-                  'application/json'
-              },
+            headers: {
+              'Content-Type':
+                'application/json'
+            },
 
-              body: JSON.stringify({
+            body: JSON.stringify({
+              inline_query_id:
+                queryId,
 
-                inline_query_id:
-                  queryId,
+              results,
 
-                results,
+              cache_time:
+                0,
 
-                cache_time:
-                  0,
-
-                is_personal:
-                  true
-              })
-            }
-          );
-
-
-        const inlineData =
-          await inlineResponse.json();
-
-
-        console.log(
-          'INLINE ANSWER RESULT:',
-          JSON.stringify(inlineData)
+              is_personal:
+                true
+            })
+          }
         );
 
 
@@ -641,30 +563,8 @@ export default {
         const cq =
           update.callback_query;
 
-
-        console.log(
-          'CALLBACK RECEIVED:',
-          JSON.stringify({
-            id: cq.id,
-            data: cq.data,
-            inline_message_id:
-              cq.inline_message_id,
-            message:
-              cq.message
-                ? {
-                    chat_id:
-                      cq.message.chat.id,
-                    message_id:
-                      cq.message.message_id
-                  }
-                : null
-          })
-        );
-
-
         const userId =
           cq.from.id;
-
 
         const userName =
           cq.from.first_name ||
@@ -672,18 +572,8 @@ export default {
           'کاربر';
 
 
-        // --------------------------------
-        // Session
-        // --------------------------------
-
-        const sessionKey =
+        let sessionKey =
           getSessionKey(cq);
-
-
-        console.log(
-          'SESSION KEY:',
-          sessionKey
-        );
 
 
         if (!sessionKey) {
@@ -698,9 +588,19 @@ export default {
         }
 
 
-        // --------------------------------
-        // عضویت
-        // --------------------------------
+        // اگر پیام اینلاین باشد و کلیدش در ممپ مستقیم نباشد، ممکن است با inline_query ذخیره شده باشد
+        if (
+          cq.inline_message_id &&
+          !activeGames.has(sessionKey)
+        ) {
+          // بررسی اینکه آیا از طریق inline_query ایجاد شده بود
+          // چون در اینلاین کوئری مستقیم دسترسی به query_id نداریم، 
+          // یک راه استاندارد این است که اگر بازی نبود یک بازی جدید بسازیم:
+          activeGames.set(sessionKey, generateNewGame());
+          selectedCellsMap.set(sessionKey, null);
+          userScoresMap.set(sessionKey, new Map());
+        }
+
 
         const isMember =
           await checkUserMembership(
@@ -721,51 +621,39 @@ export default {
         }
 
 
-        // --------------------------------
-        // بازی را پیدا کن
-        // --------------------------------
-
         let gameState =
           activeGames.get(
             sessionKey
           );
 
 
-        // --------------------------------
-        // اگر بازی پیدا نشد
-        // --------------------------------
-
         if (!gameState) {
 
-          console.error(
-            'GAME NOT FOUND:',
-            sessionKey
+          gameState =
+            generateNewGame();
+
+          activeGames.set(
+            sessionKey,
+            gameState
           );
 
-
-          await answerCallback(
-            BOT_TOKEN,
-            cq.id,
-            '⚠️ این بازی دیگر در حافظه ربات موجود نیست. لطفاً بازی جدید را شروع کنید.'
+          selectedCellsMap.set(
+            sessionKey,
+            null
           );
 
-          return new Response('OK');
+          userScoresMap.set(
+            sessionKey,
+            new Map()
+          );
         }
 
-
-        // --------------------------------
-        // وضعیت انتخاب
-        // --------------------------------
 
         let selectedCell =
           selectedCellsMap.get(
             sessionKey
           ) || null;
 
-
-        // --------------------------------
-        // امتیازات
-        // --------------------------------
 
         let scores =
           userScoresMap.get(
@@ -777,7 +665,6 @@ export default {
 
           scores =
             new Map();
-
 
           userScoresMap.set(
             sessionKey,
@@ -798,9 +685,9 @@ export default {
           cq.data;
 
 
-        // =================================
+        // ==================================
         // noop
-        // =================================
+        // ==================================
 
         if (
           data === 'noop'
@@ -815,9 +702,9 @@ export default {
         }
 
 
-        // =================================
+        // ==================================
         // بازی جدید
-        // =================================
+        // ==================================
 
         if (
           data === 'new_game'
@@ -826,48 +713,38 @@ export default {
           gameState =
             generateNewGame();
 
-
           activeGames.set(
             sessionKey,
             gameState
           );
 
-
           selectedCell =
             null;
-
 
           selectedCellsMap.set(
             sessionKey,
             null
           );
 
-
           scores =
             new Map();
-
 
           userScoresMap.set(
             sessionKey,
             scores
           );
 
-
           await answerCallback(
             BOT_TOKEN,
             cq.id,
             '🔄 بازی جدید ساخته شد.'
           );
-
-
-          // ادامه می‌دهیم تا همان پیام
-          // با جدول جدید آپدیت شود.
         }
 
 
-        // =================================
+        // ==================================
         // حالت مداد
-        // =================================
+        // ==================================
 
         else if (
           data === 'toggle_pencil'
@@ -875,7 +752,6 @@ export default {
 
           gameState.pencilMode =
             !gameState.pencilMode;
-
 
           await answerCallback(
             BOT_TOKEN,
@@ -887,9 +763,9 @@ export default {
         }
 
 
-        // =================================
+        // ==================================
         // لغو انتخاب
-        // =================================
+        // ==================================
 
         else if (
           data === 'deselect'
@@ -898,12 +774,10 @@ export default {
           selectedCell =
             null;
 
-
           selectedCellsMap.set(
             sessionKey,
             null
           );
-
 
           await answerCallback(
             BOT_TOKEN,
@@ -912,9 +786,9 @@ export default {
         }
 
 
-        // =================================
+        // ==================================
         // انتخاب خانه
-        // =================================
+        // ==================================
 
         else if (
           data.startsWith('cell_')
@@ -923,10 +797,8 @@ export default {
           const parts =
             data.split('_');
 
-
           const r =
             Number(parts[1]);
-
 
           const c =
             Number(parts[2]);
@@ -956,50 +828,26 @@ export default {
             c
           };
 
-
           selectedCellsMap.set(
             sessionKey,
             selectedCell
           );
-
 
           await answerCallback(
             BOT_TOKEN,
             cq.id,
             `📍 خانه ${r + 1}،${c + 1} انتخاب شد.`
           );
+        }
 
 
-          // فقط همان عکس موجود آپدیت می‌شود
-          const editResult =
-            await updateGameMessage(
-              BOT_TOKEN,
-              cq,
-              gameState,
-              selectedCell,
-              scores
-            );
-
-
-          console.log(
-            'CELL EDIT RESULT:',
-            JSON.stringify(editResult)
-          );
-
-
-          return new Response('OK');
-    }
-        // =================================
+        // ==================================
         // ورود عدد
-        // =================================
+        // ==================================
 
         else if (
           data.startsWith('input_')
         ) {
-
-          // -------------------------------
-          // خانه انتخاب نشده
-          // -------------------------------
 
           if (!selectedCell) {
 
@@ -1012,10 +860,6 @@ export default {
             return new Response('OK');
           }
 
-
-          // -------------------------------
-          // حداکثر ۳ خطا
-          // -------------------------------
 
           if (
             userStats.mistakes >= 3
@@ -1056,18 +900,12 @@ export default {
           const r =
             selectedCell.r;
 
-
           const c =
             selectedCell.c;
-
 
           const cell =
             gameState.board[r][c];
 
-
-          // -------------------------------
-          // خانه ثابت
-          // -------------------------------
 
           if (
             cell.given
@@ -1076,16 +914,12 @@ export default {
             await answerCallback(
               BOT_TOKEN,
               cq.id,
-              '🔒 این خانه از ابتدا پر شده و قابل تغییر نیست.'
+              '🔒 این خانه اولیه است و قابل تغییر نیست.'
             );
 
             return new Response('OK');
           }
 
-
-          // =================================
-          // حالت مداد
-          // =================================
 
           if (
             gameState.pencilMode
@@ -1099,7 +933,6 @@ export default {
             }
 
 
-            // پاک کردن همه یادداشت‌ها
             if (
               val === 0
             ) {
@@ -1108,7 +941,6 @@ export default {
 
             } else {
 
-              // حذف
               if (
                 cell.notes.includes(val)
               ) {
@@ -1118,10 +950,7 @@ export default {
                     n => n !== val
                   );
 
-              }
-
-              // اضافه
-              else {
+              } else {
 
                 cell.notes.push(val);
 
@@ -1137,18 +966,8 @@ export default {
               cq.id,
               '✏️ یادداشت به‌روزرسانی شد.'
             );
-          }
 
-
-          // =================================
-          // حالت عادی ورود عدد
-          // =================================
-
-          else {
-
-            // -----------------------------
-            // پاک کردن
-            // -----------------------------
+          } else {
 
             if (
               val === 0
@@ -1157,28 +976,16 @@ export default {
               cell.value =
                 null;
 
-
               cell.isError =
                 false;
-
 
               await answerCallback(
                 BOT_TOKEN,
                 cq.id,
                 '🧹 خانه پاک شد.'
               );
-            }
 
-
-            // -----------------------------
-            // ورود عدد
-            // -----------------------------
-
-            else {
-
-              // ---------------------------
-              // ساخت وضعیت موقت
-              // ---------------------------
+            } else {
 
               const tempBoard =
                 gameState.board.map(
@@ -1189,16 +996,8 @@ export default {
                     )
                 );
 
-
-              // خانه فعلی را خالی می‌کنیم
-              // تا isValid خودش خانه را بررسی کند
               tempBoard[r][c] =
                 null;
-
-
-              // ---------------------------
-              // بررسی قانون سودوکو
-              // ---------------------------
 
               const validByRules =
                 isValid(
@@ -1208,35 +1007,23 @@ export default {
                   val
                 );
 
-
-              // ---------------------------
-              // بررسی جواب اصلی
-              // ---------------------------
-
-              const isCorrect =
+              const correctSolution =
                 val ===
                 cell.solutionValue;
 
 
-              // ---------------------------
-              // اشتباه
-              // ---------------------------
-
               if (
                 !validByRules ||
-                !isCorrect
+                !correctSolution
               ) {
 
                 cell.value =
                   val;
 
-
                 cell.isError =
                   true;
 
-
                 userStats.mistakes++;
-
 
                 userStats.score =
                   Math.max(
@@ -1244,174 +1031,71 @@ export default {
                     userStats.score - 5
                   );
 
-
                 gameState.mistakes =
                   (gameState.mistakes || 0) + 1;
-
 
                 await answerCallback(
                   BOT_TOKEN,
                   cq.id,
-                  '❌ عدد اشتباه است. ۵ امتیاز کم شد.'
+                  '❌ عدد اشتباه است.'
                 );
-              }
 
-
-              // ---------------------------
-              // صحیح
-              // ---------------------------
-
-              else {
+              } else {
 
                 cell.value =
                   val;
 
-
                 cell.isError =
                   false;
-
 
                 cell.notes =
                   [];
 
-
                 userStats.score +=
                   10;
-
 
                 await answerCallback(
                   BOT_TOKEN,
                   cq.id,
-                  '✅ درست! ۱۰ امتیاز گرفتی.'
+                  '✅ درست!'
                 );
               }
             }
           }
+
+          checkGameCompletion(
+            gameState
+          );
         }
 
 
-        // =================================
-        // Callback ناشناخته
-        // =================================
+        // ==================================
+        // رندر و آپدیت نهایی پیام
+        // ==================================
 
-        else {
-
-          console.log(
-            'UNKNOWN CALLBACK:',
-            data
-          );
-
-
-          await answerCallback(
-            BOT_TOKEN,
-            cq.id,
-            '❓ دستور ناشناخته است.'
-          );
-
-
-          return new Response('OK');
-        }
-
-
-        // =================================
-        // بررسی پایان بازی
-        // =================================
-
-        checkGameCompletion(
-          gameState
+        await updateGameMessage(
+          BOT_TOKEN,
+          cq,
+          gameState,
+          selectedCell,
+          scores
         );
-
-
-        // =================================
-        // ساخت تصویر جدید
-        // =================================
-
-        const finalSvg =
-          renderSudokuSVG(
-            gameState,
-            selectedCell
-          );
-
-
-        // =================================
-        // ساخت کیبورد جدید
-        // =================================
-
-        const finalKeyboard =
-          buildControlKeyboard(
-            gameState,
-            selectedCell,
-            scores
-          );
-
-
-        // =================================
-        // آپدیت همان پیام
-        // =================================
-
-        if (
-          cq.message
-        ) {
-
-          const result =
-            await updateSudokuPhoto(
-              BOT_TOKEN,
-              cq.message.chat.id,
-              cq.message.message_id,
-              finalSvg,
-              finalKeyboard
-            );
-
-
-          console.log(
-            'FINAL EDIT RESULT:',
-            JSON.stringify(result)
-          );
-        }
-
-
-        else if (
-          cq.inline_message_id
-        ) {
-
-          const result =
-            await updateInlineSudokuPhoto(
-              BOT_TOKEN,
-              cq.inline_message_id,
-              finalSvg,
-              finalKeyboard
-            );
-
-
-          console.log(
-            'FINAL INLINE EDIT RESULT:',
-            JSON.stringify(result)
-          );
-        }
 
 
         return new Response('OK');
       }
 
-
-      // ====================================
-      // آپدیت ناشناخته
-      // ====================================
-
       return new Response('OK');
-
 
     } catch (error) {
 
       console.error(
-        'MAIN ERROR:',
+        'Worker execution error:',
         error
       );
 
-
       return new Response(
-        error?.message ||
-          'Internal Server Error',
+        'Internal Server Error',
         {
           status: 500
         }
@@ -1419,3 +1103,4 @@ export default {
     }
   }
 };
+                  
