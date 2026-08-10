@@ -1408,3 +1408,4 @@ async function loadGame(
       Number(
         row.created_at
       )
+  }
