@@ -4,6 +4,23 @@
 // Cloudflare Workers
 // ==========================================
 
+// ==========================================
+// src/index.js
+// ==========================================
+
+const BOT_TOKEN = "8604292634:AAHBsJ9HXgISutUw6S0qTRcOWi08nn38ZuY"; // توکن ربات خود را اینجا بگذارید
+
+export default {
+  async fetch(request, env, ctx) {
+    // اگر از توکن داخل کد استفاده می‌کنید، آن را به عنوان متغیر به سیستم ارسال می‌کنیم
+    const token = BOT_TOKEN; 
+
+    // بقیه کدهای مربوط به پردازش درخواست و وب‌هوک...
+    
+    return new Response("Bot is running", { status: 200 });
+  }
+};
+
 import {
   generateNewGame,
   isValid
