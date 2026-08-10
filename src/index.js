@@ -45,7 +45,7 @@ const userScoresMap = new Map();
 
 
 // ==========================================
-// بررسی عضویت
+// بررسی عضویت در کانال‌ها
 // ==========================================
 
 async function checkUserMembership(userId, token) {
@@ -98,7 +98,7 @@ function getSessionKey(cq) {
 
 
 // ==========================================
-// ساخت امتیاز کاربر
+// مدیریت امتیاز بازیکنان
 // ==========================================
 
 function ensureUserScore(scores, userId, userName) {
@@ -114,7 +114,7 @@ function ensureUserScore(scores, userId, userName) {
 
 
 // ==========================================
-// بررسی پایان بازی
+// بررسی اتمام و درستی بازی
 // ==========================================
 
 function checkGameCompletion(gameState) {
@@ -145,7 +145,7 @@ function checkGameCompletion(gameState) {
 
 
 // ==========================================
-// رندر و آپدیت پیام
+// رندر و آپدیت پیام تصویر سودوکو
 // ==========================================
 
 async function updateGameMessage(BOT_TOKEN, cq, gameState, selectedCell, scores) {
@@ -176,20 +176,13 @@ async function updateGameMessage(BOT_TOKEN, cq, gameState, selectedCell, scores)
 
 
 // ==========================================
-// Worker خروجی اصلی
+// Worker اصلی
 // ==========================================
 
 export default {
   async fetch(request, env, ctx) {
-    // خواندن توکن از متغیر محیطی کلودفلر
-    const BOT_TOKEN = env.BOT_TOKEN;
-
-    if (!BOT_TOKEN) {
-      console.error('BOT_TOKEN is missing.');
-      return new Response('BOT_TOKEN is not configured.', {
-        status: 500
-      });
-    }
+    // قرارگیری مستقیم توکن برای جلوگیری از خطای متغیرهای محیطی
+    const BOT_TOKEN = "8604292634:AAHBsJ9HXgISutUw6S0qTRcOWi08nn38ZuY";
 
     if (request.method !== 'POST') {
       return new Response('Sudoku Bot is running!');
@@ -199,7 +192,7 @@ export default {
       const update = await request.json();
 
       // ====================================
-      // /start
+      // دستور /start
       // ====================================
       if (update.message && update.message.text) {
         const message = update.message;
@@ -251,7 +244,7 @@ export default {
       }
 
       // ====================================
-      // Inline Query
+      // Inline Query (بازی گروهی)
       // ====================================
       if (update.inline_query) {
         const inlineQuery = update.inline_query;
@@ -306,7 +299,7 @@ export default {
       }
 
       // ====================================
-      // Callback Query
+      // Callback Query (کلیک روی دکمه‌ها)
       // ====================================
       if (update.callback_query) {
         const cq = update.callback_query;
