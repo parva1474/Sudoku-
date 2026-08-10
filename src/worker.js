@@ -2,7 +2,7 @@
 // src/worker.js
 // Telegram Sudoku Bot
 // Cloudflare Workers + D1
-// جدول 9×9 به صورت PNG
+// جدول Sudoku به صورت PNG
 // ==========================================
 
 import {
@@ -27,14 +27,8 @@ import {
 import {
   buildNumberKeyboard,
   buildDifficultyKeyboard,
-  buildFinishedKeyboard,
-  buildBlockKeyboard,
-  buildCellKeyboard
+  buildFinishedKeyboard
 } from "./keyboard.js";
-
-import {
-  getHint
-} from "./sudoku.js";
 
 import {
   renderSudokuPNG
@@ -161,9 +155,9 @@ async function handleMessage(
       message.text || ""
     ).trim();
 
-  // ----------------------------------------
+  // ========================================
   // /start
-  // ----------------------------------------
+  // ========================================
 
   if (text === "/start") {
 
@@ -175,9 +169,9 @@ async function handleMessage(
     return;
   }
 
-  // ----------------------------------------
+  // ========================================
   // /new
-  // ----------------------------------------
+  // ========================================
 
   if (text === "/new") {
 
@@ -192,15 +186,20 @@ async function handleMessage(
     return;
   }
 
-  // ----------------------------------------
-  // Difficulty commands
-  // ----------------------------------------
+  // ========================================
+  // Difficulty
+  // ========================================
 
   const difficultyCommands = {
+
     "/easy": "easy",
+
     "/medium": "medium",
+
     "/hard": "hard",
+
     "/expert": "expert",
+
     "/master": "master"
   };
 
@@ -219,9 +218,9 @@ async function handleMessage(
     return;
   }
 
-  // ----------------------------------------
+  // ========================================
   // /game
-  // ----------------------------------------
+  // ========================================
 
   if (text === "/game") {
 
@@ -242,7 +241,7 @@ async function handleMessage(
       return;
     }
 
-    await sendGameMessage(
+    await sendGamePhoto(
       token,
       chatId,
       game
@@ -251,9 +250,9 @@ async function handleMessage(
     return;
   }
 
-  // ----------------------------------------
+  // ========================================
   // /help
-  // ----------------------------------------
+  // ========================================
 
   if (text === "/help") {
 
@@ -303,12 +302,11 @@ async function sendHelp(
   const text = [
     "🧩 <b>راهنمای Sudoku</b>",
     "",
-    "🔲 ابتدا یکی از ۹ بلوک را انتخاب کن.",
-    "👆 سپس خانه موردنظر را انتخاب کن.",
-    "🔢 عدد موردنظر را وارد کن.",
-    "✏️ برای Pencil حالت مداد را روشن کن.",
+    "👆 خانه موردنظر را انتخاب کن.",
+    "🔢 سپس عدد را انتخاب کن.",
+    "✏️ برای یادداشت از حالت مداد استفاده کن.",
     "🧹 برای پاک کردن عدد استفاده کن.",
-    "💡 راهنمایی یک حرکت درست را وارد می‌کند.",
+    "💡 راهنمایی یک حرکت درست انجام می‌دهد.",
     "",
     "🔒 خانه‌های اولیه قابل تغییر نیستند."
   ].join("\n");
@@ -321,7 +319,7 @@ async function sendHelp(
 }
 
 // ==========================================
-// شروع بازی جدید
+// شروع بازی
 // ==========================================
 
 async function startNewGame(
@@ -372,10 +370,35 @@ async function startNewGame(
     game
   );
 
-  await sendGameMessage(
+  await sendGamePhoto(
     token,
     chatId,
     game
+  );
+}
+
+// ==========================================
+// ارسال عکس جدول
+// ==========================================
+
+async function sendGamePhoto(
+  token,
+  chatId,
+  game
+) {
+
+  const png =
+    await renderSudokuPNG(game);
+
+  const caption =
+    createBoardCaption(game);
+
+  await sendPhoto(
+    token,
+    chatId,
+    png,
+    caption,
+    buildNumberKeyboard(game)
   );
 }
 
@@ -457,7 +480,7 @@ async function handleCallbackQuery(
       game
     );
 
-    await sendGameMessage(
+    await sendGamePhoto(
       token,
       chatId,
       game
@@ -473,7 +496,7 @@ async function handleCallbackQuery(
   }
 
   // ========================================
-  // Load game
+  // Load Game
   // ========================================
 
   let game =
@@ -494,54 +517,7 @@ async function handleCallbackQuery(
   }
 
   // ========================================
-  // انتخاب بلوک 3×3
-  // ========================================
-
-  if (
-    data.startsWith("block:")
-  ) {
-
-    const block =
-      Number(
-        data.split(":")[1]
-      );
-
-    if (
-      !Number.isInteger(block) ||
-      block < 0 ||
-      block > 8
-    ) {
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "بلوک نامعتبر است."
-      );
-
-      return;
-    }
-
-    await editMessageText(
-      token,
-      message.chat.id,
-      message.message_id,
-      createCellSelectionText(
-        game,
-        block
-      ),
-      buildCellKeyboard(block)
-    );
-
-    await answerCallbackQuery(
-      token,
-      callbackId
-    );
-
-    return;
-  }
-
-  // ========================================
-  // انتخاب خانه داخل بلوک
+  // انتخاب خانه
   // ========================================
 
   if (
@@ -584,12 +560,10 @@ async function handleCallbackQuery(
       game.puzzle[index] !== null
     ) {
 
-      await editMessageText(
+      await editGamePhoto(
         token,
-        message.chat.id,
-        message.message_id,
-        createBoardInfoText(game),
-        buildBlockKeyboard()
+        message,
+        game
       );
 
       await answerCallbackQuery(
@@ -601,12 +575,10 @@ async function handleCallbackQuery(
       return;
     }
 
-    await editMessageText(
+    await editGamePhoto(
       token,
-      message.chat.id,
-      message.message_id,
-      createNumberScreenText(game),
-      buildNumberKeyboard(game)
+      message,
+      game
     );
 
     await answerCallbackQuery(
@@ -634,31 +606,11 @@ async function handleCallbackQuery(
       game
     );
 
-    if (
-      game.selectedCell !== -1 &&
-      game.puzzle[
-        game.selectedCell
-      ] === null
-    ) {
-
-      await editMessageText(
-        token,
-        message.chat.id,
-        message.message_id,
-        createNumberScreenText(game),
-        buildNumberKeyboard(game)
-      );
-
-    } else {
-
-      await editMessageText(
-        token,
-        message.chat.id,
-        message.message_id,
-        createBoardInfoText(game),
-        buildBlockKeyboard()
-      );
-    }
+    await editGamePhoto(
+      token,
+      message,
+      game
+    );
 
     await answerCallbackQuery(
       token,
@@ -705,12 +657,10 @@ async function handleCallbackQuery(
       game
     );
 
-    await editMessageText(
+    await editGamePhoto(
       token,
-      message.chat.id,
-      message.message_id,
-      createNumberScreenText(game),
-      buildNumberKeyboard(game)
+      message,
+      game
     );
 
     await answerCallbackQuery(
@@ -750,12 +700,26 @@ async function handleCallbackQuery(
         data.split(":")[1]
       );
 
+    if (
+      number < 1 ||
+      number > 9
+    ) {
+
+      await answerCallbackQuery(
+        token,
+        callbackId,
+        "عدد نامعتبر است."
+      );
+
+      return;
+    }
+
     const index =
       game.selectedCell;
 
-    // --------------------------------------
+    // ======================================
     // Pencil
-    // --------------------------------------
+    // ======================================
 
     if (
       game.pencilMode
@@ -775,12 +739,10 @@ async function handleCallbackQuery(
         game
       );
 
-      await editMessageText(
+      await editGamePhoto(
         token,
-        message.chat.id,
-        message.message_id,
-        createNumberScreenText(game),
-        buildNumberKeyboard(game)
+        message,
+        game
       );
 
       await answerCallbackQuery(
@@ -798,9 +760,9 @@ async function handleCallbackQuery(
       return;
     }
 
-    // --------------------------------------
+    // ======================================
     // عدد اصلی
-    // --------------------------------------
+    // ======================================
 
     const result =
       putNumber(
@@ -816,20 +778,19 @@ async function handleCallbackQuery(
       game
     );
 
-    // --------------------------------------
+    // ======================================
     // برد
-    // --------------------------------------
+    // ======================================
 
     if (
       result.won
     ) {
 
-      await updateSudokuPhoto(
+      await editGamePhoto(
         token,
         message,
         game,
-        createBoardInfoText(game),
-        buildFinishedKeyboard()
+        true
       );
 
       await answerCallbackQuery(
@@ -841,20 +802,18 @@ async function handleCallbackQuery(
       return;
     }
 
-    // --------------------------------------
+    // ======================================
     // اشتباه
-    // --------------------------------------
+    // ======================================
 
     if (
       result.mistake
     ) {
 
-      await editMessageText(
+      await editGamePhoto(
         token,
-        message.chat.id,
-        message.message_id,
-        createNumberScreenText(game),
-        buildNumberKeyboard(game)
+        message,
+        game
       );
 
       await answerCallbackQuery(
@@ -866,16 +825,14 @@ async function handleCallbackQuery(
       return;
     }
 
-    // --------------------------------------
-    // عدد صحیح
-    // --------------------------------------
+    // ======================================
+    // صحیح
+    // ======================================
 
-    await updateSudokuPhoto(
+    await editGamePhoto(
       token,
       message,
-      game,
-      createBoardInfoText(game),
-      buildBlockKeyboard()
+      game
     );
 
     await answerCallbackQuery(
@@ -895,27 +852,9 @@ async function handleCallbackQuery(
     data === "action:hint"
   ) {
 
-    let hintResult = null;
-
-    try {
-
-      hintResult =
-        getHint(
-          game.board
-        );
-
-    } catch (error) {
-
-      console.error(
-        "Hint error:",
-        error
-      );
-    }
-
     const result =
       applyHint(
-        game,
-        hintResult
+        game
       );
 
     await saveGame(
@@ -925,33 +864,11 @@ async function handleCallbackQuery(
       game
     );
 
-    if (
-      result.won
-    ) {
-
-      await updateSudokuPhoto(
-        token,
-        message,
-        game,
-        createBoardInfoText(game),
-        buildFinishedKeyboard()
-      );
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "🎉 راهنمایی باعث تکمیل جدول شد."
-      );
-
-      return;
-    }
-
-    await updateSudokuPhoto(
+    await editGamePhoto(
       token,
       message,
       game,
-      createBoardInfoText(game),
-      buildBlockKeyboard()
+      result.won
     );
 
     await answerCallbackQuery(
@@ -983,12 +900,10 @@ async function handleCallbackQuery(
       freshGame
     );
 
-    await updateSudokuPhoto(
+    await editGamePhoto(
       token,
       message,
-      freshGame,
-      createBoardInfoText(freshGame),
-      buildBlockKeyboard()
+      freshGame
     );
 
     await answerCallbackQuery(
@@ -1001,52 +916,8 @@ async function handleCallbackQuery(
   }
 
   // ========================================
-  // Back to blocks
+  // پایان
   // ========================================
-
-  if (
-    data === "action:blocks"
-  ) {
-
-    await editMessageText(
-      token,
-      message.chat.id,
-      message.message_id,
-      createBoardInfoText(game),
-      buildBlockKeyboard()
-    );
-
-    await answerCallbackQuery(
-      token,
-      callbackId
-    );
-
-    return;
-  }
-
-  // ========================================
-  // Back to board
-  // ========================================
-
-  if (
-    data === "action:board"
-  ) {
-
-    await editMessageText(
-      token,
-      message.chat.id,
-      message.message_id,
-      createBoardInfoText(game),
-      buildBlockKeyboard()
-    );
-
-    await answerCallbackQuery(
-      token,
-      callbackId
-    );
-
-    return;
-  }
 
   await answerCallbackQuery(
     token,
@@ -1055,102 +926,66 @@ async function handleCallbackQuery(
 }
 
 // ==========================================
-// ارسال بازی جدید
+// ویرایش عکس جدول
 // ==========================================
 
-async function sendGameMessage(
+async function editGamePhoto(
   token,
-  chatId,
-  game
+  message,
+  game,
+  finished = false
 ) {
 
   const png =
     await renderSudokuPNG(game);
 
-  await sendPhoto(
+  const caption =
+    createBoardCaption(game);
+
+  const keyboard =
+    finished
+      ? buildFinishedKeyboard()
+      : buildNumberKeyboard(game);
+
+  await editMessagePhoto(
     token,
-    chatId,
+    message.chat.id,
+    message.message_id,
     png,
-    createBoardInfoText(game),
-    buildBlockKeyboard()
+    caption,
+    keyboard
   );
 }
 
 // ==========================================
-// بروزرسانی تصویر Sudoku
+// Caption جدول
 // ==========================================
 
-async function updateSudokuPhoto(
-  token,
-  message,
-  game,
-  caption,
-  replyMarkup
-) {
-
-  /*
-   * پیام بازی جدید باید عکس باشد.
-   *
-   * در صورتی که پیام فعلی هنوز متن باشد،
-   * ابتدا پیام متن را ویرایش نمی‌کنیم.
-   */
-
-  const png =
-    await renderSudokuPNG(game);
-
-  try {
-
-    await editMessagePhoto(
-      token,
-      message.chat.id,
-      message.message_id,
-      png,
-      caption,
-      replyMarkup
-    );
-
-  } catch (error) {
-
-    /*
-     * اگر پیام فعلی عکس نباشد،
-     * آن را با یک پیام متنی جایگزین می‌کنیم.
-     *
-     * این حالت فقط برای بازی‌های قدیمی
-     * که قبل از نسخه تصویری ساخته شده‌اند
-     * اتفاق می‌افتد.
-     */
-
-    console.error(
-      "editMessagePhoto failed:",
-      error
-    );
-
-    await editMessageText(
-      token,
-      message.chat.id,
-      message.message_id,
-      caption,
-      replyMarkup
-    );
-  }
-}
-
-// ==========================================
-// متن اطلاعات بازی
-// ==========================================
-
-function createBoardInfoText(
+function createBoardCaption(
   game
 ) {
 
   const lines = [
+
     "🧩 <b>Sudoku</b>",
-    "",
-    `🎯 سطح: ${getDifficultyName(game.difficulty)}`,
-    `📊 پیشرفت: ${getProgress(game)}%`,
-    `❌ اشتباه: ${game.mistakes}`,
-    `💡 راهنمایی: ${game.hints}`,
-    ""
+
+    `🎯 سطح: ${
+      getDifficultyName(
+        game.difficulty
+      )
+    }`,
+
+    `📊 پیشرفت: ${
+      getProgress(game)
+    }%`,
+
+    `❌ اشتباه: ${
+      game.mistakes
+    }`,
+
+    `💡 راهنمایی: ${
+      game.hints
+    }`
   ];
 
   if (
@@ -1158,6 +993,7 @@ function createBoardInfoText(
   ) {
 
     lines.push(
+      "",
       "🎉 <b>جدول حل شد!</b>"
     );
 
@@ -1176,93 +1012,19 @@ function createBoardInfoText(
       ) + 1;
 
     lines.push(
+      "",
       `📍 خانه انتخاب‌شده: ${row},${col}`
     );
 
   } else {
 
     lines.push(
-      "👆 ابتدا یکی از بلوک‌های ۳×۳ را انتخاب کن."
+      "",
+      "👆 یک خانه را انتخاب کن."
     );
   }
 
   return lines.join("\n");
-}
-
-// ==========================================
-// انتخاب خانه
-// ==========================================
-
-function createCellSelectionText(
-  game,
-  block
-) {
-
-  const blockRow =
-    Math.floor(block / 3);
-
-  const blockCol =
-    block % 3;
-
-  const startRow =
-    blockRow * 3 + 1;
-
-  const startCol =
-    blockCol * 3 + 1;
-
-  return [
-    "🧩 <b>انتخاب خانه</b>",
-    "",
-    `📦 بلوک: ${block + 1}`,
-    `📍 سطرهای ${startRow} تا ${startRow + 2}`,
-    `📍 ستون‌های ${startCol} تا ${startCol + 2}`,
-    "",
-    "👆 یکی از خانه‌های این بلوک را انتخاب کن."
-  ].join("\n");
-}
-
-// ==========================================
-// صفحه انتخاب عدد
-// ==========================================
-
-function createNumberScreenText(
-  game
-) {
-
-  const index =
-    game.selectedCell;
-
-  const row =
-    Math.floor(index / 9) + 1;
-
-  const col =
-    (index % 9) + 1;
-
-  const notes =
-    Array.isArray(
-      game.notes[index]
-    )
-      ? game.notes[index]
-      : [];
-
-  const current =
-    game.board[index];
-
-  return [
-    "🔢 <b>انتخاب عدد</b>",
-    "",
-    `📍 خانه: سطر ${row}، ستون ${col}`,
-    `🔢 مقدار فعلی: ${current ?? "خالی"}`,
-    `✏️ یادداشت‌ها: ${
-      notes.length
-        ? notes.join(" ")
-        : "—"
-    }`,
-    "",
-    game.pencilMode
-      ? "✏️ <b>حالت مداد فعال است</b>"
-      : "عدد موردنظر را انتخاب کن:"
-  ].join("\n");
 }
 
 // ==========================================
@@ -1334,20 +1096,46 @@ async function saveGame(
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     .bind(
+
       chatId,
+
       userId,
-      JSON.stringify(game.puzzle),
-      JSON.stringify(game.solution),
-      JSON.stringify(game.board),
-      JSON.stringify(game.notes),
+
+      JSON.stringify(
+        game.puzzle
+      ),
+
+      JSON.stringify(
+        game.solution
+      ),
+
+      JSON.stringify(
+        game.board
+      ),
+
+      JSON.stringify(
+        game.notes
+      ),
+
       game.selectedCell,
+
       game.difficulty,
+
       game.mistakes,
+
       game.hints,
-      game.pencilMode ? 1 : 0,
+
+      game.pencilMode
+        ? 1
+        : 0,
+
       game.status,
-      game.createdAt || now,
+
+      game.createdAt ||
+        now,
+
       now
+
     )
     .run();
 }
@@ -1386,36 +1174,54 @@ async function loadGame(
   return {
 
     puzzle:
-      JSON.parse(row.puzzle),
+      JSON.parse(
+        row.puzzle
+      ),
 
     solution:
-      JSON.parse(row.solution),
+      JSON.parse(
+        row.solution
+      ),
 
     board:
-      JSON.parse(row.board),
+      JSON.parse(
+        row.board
+      ),
 
     notes:
-      JSON.parse(row.notes),
+      JSON.parse(
+        row.notes
+      ),
 
     selectedCell:
-      Number(row.selected_cell),
+      Number(
+        row.selected_cell
+      ),
 
     difficulty:
       row.difficulty,
 
     mistakes:
-      Number(row.mistakes),
+      Number(
+        row.mistakes
+      ),
 
     hints:
-      Number(row.hints),
+      Number(
+        row.hints
+      ),
 
     pencilMode:
-      Boolean(row.pencil_mode),
+      Boolean(
+        row.pencil_mode
+      ),
 
     status:
       row.status,
 
     createdAt:
-      Number(row.created_at)
+      Number(
+        row.created_at
+      )
   };
 }
