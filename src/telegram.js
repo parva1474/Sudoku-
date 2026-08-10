@@ -127,7 +127,199 @@ export async function editMessageText(
 }
 
 // ==========================================
-// پاسخ به Callback Query
+// ارسال عکس PNG
+// ==========================================
+
+export async function sendPhoto(
+  token,
+  chatId,
+  pngBytes,
+  caption = "",
+  replyMarkup = null
+) {
+  const url =
+    `https://api.telegram.org/bot${token}/sendPhoto`;
+
+  const form =
+    new FormData();
+
+  form.append(
+    "chat_id",
+    String(chatId)
+  );
+
+  if (caption) {
+    form.append(
+      "caption",
+      caption
+    );
+
+    form.append(
+      "parse_mode",
+      "HTML"
+    );
+  }
+
+  if (replyMarkup) {
+    form.append(
+      "reply_markup",
+      JSON.stringify(
+        replyMarkup
+      )
+    );
+  }
+
+  // تبدیل Uint8Array به Blob
+  const blob =
+    new Blob(
+      [pngBytes],
+      {
+        type:
+          "image/png"
+      }
+    );
+
+  form.append(
+    "photo",
+    blob,
+    "sudoku.png"
+  );
+
+  const response =
+    await fetch(
+      url,
+      {
+        method: "POST",
+        body: form
+      }
+    );
+
+  let data;
+
+  try {
+    data =
+      await response.json();
+  } catch {
+    throw new Error(
+      `Telegram returned invalid JSON while sending photo. HTTP ${response.status}`
+    );
+  }
+
+  if (!response.ok || !data.ok) {
+    throw new Error(
+      `Telegram API error in sendPhoto: ${
+        data?.description ||
+        `HTTP ${response.status}`
+      }`
+    );
+  }
+
+  return data.result;
+}
+
+// ==========================================
+// ویرایش عکس پیام
+// ==========================================
+
+export async function editMessagePhoto(
+  token,
+  chatId,
+  messageId,
+  pngBytes,
+  caption = "",
+  replyMarkup = null
+) {
+  const url =
+    `https://api.telegram.org/bot${token}/editMessageMedia`;
+
+  const form =
+    new FormData();
+
+  form.append(
+    "chat_id",
+    String(chatId)
+  );
+
+  form.append(
+    "message_id",
+    String(messageId)
+  );
+
+  const blob =
+    new Blob(
+      [pngBytes],
+      {
+        type:
+          "image/png"
+      }
+    );
+
+  form.append(
+    "media",
+    JSON.stringify({
+      type:
+        "photo",
+
+      media:
+        "attach://sudoku",
+
+      caption:
+        caption,
+
+      parse_mode:
+        "HTML"
+    })
+  );
+
+  form.append(
+    "photo",
+    blob,
+    "sudoku.png"
+  );
+
+  if (replyMarkup) {
+    form.append(
+      "reply_markup",
+      JSON.stringify(
+        replyMarkup
+      )
+    );
+  }
+
+  const response =
+    await fetch(
+      url,
+      {
+        method: "POST",
+        body: form
+      }
+    );
+
+  let data;
+
+  try {
+    data =
+      await response.json();
+  } catch {
+    throw new Error(
+      `Telegram returned invalid JSON while editing photo. HTTP ${response.status}`
+    );
+  }
+
+  if (!response.ok || !data.ok) {
+    throw new Error(
+      `Telegram API error in editMessageMedia: ${
+        data?.description ||
+        `HTTP ${response.status}`
+      }`
+    );
+  }
+
+  return data.result;
+}
+
+// ==========================================
+// پاسخ Callback Query
 // ==========================================
 
 export async function answerCallbackQuery(
@@ -179,7 +371,7 @@ export async function deleteMessage(
 }
 
 // ==========================================
-// تنظیم Webhook
+// Webhook
 // ==========================================
 
 export async function setWebhook(
@@ -201,10 +393,6 @@ export async function setWebhook(
   );
 }
 
-// ==========================================
-// حذف Webhook
-// ==========================================
-
 export async function deleteWebhook(
   token
 ) {
@@ -217,10 +405,6 @@ export async function deleteWebhook(
     }
   );
 }
-
-// ==========================================
-// دریافت اطلاعات Webhook
-// ==========================================
 
 export async function getWebhookInfo(
   token
