@@ -2,11 +2,14 @@
 // src/worker.js
 // Telegram Sudoku Bot
 // Cloudflare Workers + D1
+// جدول 9×9 به صورت PNG
 // ==========================================
 
 import {
   sendMessage,
+  sendPhoto,
   editMessageText,
+  editMessagePhoto,
   answerCallbackQuery
 } from "./telegram.js";
 
@@ -22,15 +25,20 @@ import {
 } from "./game.js";
 
 import {
-  buildSudokuKeyboard,
   buildNumberKeyboard,
   buildDifficultyKeyboard,
-  buildFinishedKeyboard
+  buildFinishedKeyboard,
+  buildBlockKeyboard,
+  buildCellKeyboard
 } from "./keyboard.js";
 
 import {
   getHint
 } from "./sudoku.js";
+
+import {
+  renderSudokuPNG
+} from "./sudoku-image.js";
 
 // ==========================================
 // تنظیمات
@@ -55,6 +63,7 @@ export default {
   async fetch(request, env) {
 
     if (request.method === "GET") {
+
       return new Response(
         "🧩 Sudoku Bot is running.",
         { status: 200 }
@@ -62,6 +71,7 @@ export default {
     }
 
     if (request.method !== "POST") {
+
       return new Response(
         "Method Not Allowed",
         { status: 405 }
@@ -293,8 +303,9 @@ async function sendHelp(
   const text = [
     "🧩 <b>راهنمای Sudoku</b>",
     "",
-    "👆 روی یک خانه بزن.",
-    "🔢 عدد موردنظر را انتخاب کن.",
+    "🔲 ابتدا یکی از ۹ بلوک را انتخاب کن.",
+    "👆 سپس خانه موردنظر را انتخاب کن.",
+    "🔢 عدد موردنظر را وارد کن.",
     "✏️ برای Pencil حالت مداد را روشن کن.",
     "🧹 برای پاک کردن عدد استفاده کن.",
     "💡 راهنمایی یک حرکت درست را وارد می‌کند.",
@@ -326,6 +337,7 @@ async function startNewGame(
       difficulty
     )
   ) {
+
     difficulty =
       DEFAULT_DIFFICULTY;
   }
@@ -407,9 +419,9 @@ async function handleCallbackQuery(
       callback.data || ""
     );
 
-  // ----------------------------------------
+  // ========================================
   // Difficulty
-  // ----------------------------------------
+  // ========================================
 
   if (
     data.startsWith(
@@ -445,9 +457,9 @@ async function handleCallbackQuery(
       game
     );
 
-    await editGameMessage(
+    await sendGameMessage(
       token,
-      message,
+      chatId,
       game
     );
 
@@ -460,9 +472,9 @@ async function handleCallbackQuery(
     return;
   }
 
-  // ----------------------------------------
+  // ========================================
   // Load game
-  // ----------------------------------------
+  // ========================================
 
   let game =
     await loadGame(
@@ -482,7 +494,54 @@ async function handleCallbackQuery(
   }
 
   // ========================================
-  // انتخاب خانه
+  // انتخاب بلوک 3×3
+  // ========================================
+
+  if (
+    data.startsWith("block:")
+  ) {
+
+    const block =
+      Number(
+        data.split(":")[1]
+      );
+
+    if (
+      !Number.isInteger(block) ||
+      block < 0 ||
+      block > 8
+    ) {
+
+      await answerCallbackQuery(
+        token,
+        callbackId,
+        "بلوک نامعتبر است."
+      );
+
+      return;
+    }
+
+    await editMessageText(
+      token,
+      message.chat.id,
+      message.message_id,
+      createCellSelectionText(
+        game,
+        block
+      ),
+      buildCellKeyboard(block)
+    );
+
+    await answerCallbackQuery(
+      token,
+      callbackId
+    );
+
+    return;
+  }
+
+  // ========================================
+  // انتخاب خانه داخل بلوک
   // ========================================
 
   if (
@@ -509,11 +568,6 @@ async function handleCallbackQuery(
       return;
     }
 
-    /*
-     * خانه اولیه قابل انتخاب است،
-     * اما نمی‌توان عددش را تغییر داد.
-     */
-
     selectCell(
       game,
       index
@@ -526,11 +580,6 @@ async function handleCallbackQuery(
       game
     );
 
-    /*
-     * اگر خانه قفل باشد، همان جدول را
-     * نشان بده و اجازه انتخاب عدد نده.
-     */
-
     if (
       game.puzzle[index] !== null
     ) {
@@ -539,8 +588,8 @@ async function handleCallbackQuery(
         token,
         message.chat.id,
         message.message_id,
-        createBoardText(game),
-        buildSudokuKeyboard(game)
+        createBoardInfoText(game),
+        buildBlockKeyboard()
       );
 
       await answerCallbackQuery(
@@ -551,11 +600,6 @@ async function handleCallbackQuery(
 
       return;
     }
-
-    /*
-     * خانه آزاد:
-     * صفحه اعداد را نشان بده.
-     */
 
     await editMessageText(
       token,
@@ -590,11 +634,6 @@ async function handleCallbackQuery(
       game
     );
 
-    /*
-     * اگر خانه انتخاب شده باشد،
-     * صفحه اعداد باقی می‌ماند.
-     */
-
     if (
       game.selectedCell !== -1 &&
       game.puzzle[
@@ -616,8 +655,8 @@ async function handleCallbackQuery(
         token,
         message.chat.id,
         message.message_id,
-        createBoardText(game),
-        buildSudokuKeyboard(game)
+        createBoardInfoText(game),
+        buildBlockKeyboard()
       );
     }
 
@@ -778,18 +817,18 @@ async function handleCallbackQuery(
     );
 
     // --------------------------------------
-    // اگر بازی تمام شد
+    // برد
     // --------------------------------------
 
     if (
       result.won
     ) {
 
-      await editMessageText(
+      await updateSudokuPhoto(
         token,
-        message.chat.id,
-        message.message_id,
-        createBoardText(game),
+        message,
+        game,
+        createBoardInfoText(game),
         buildFinishedKeyboard()
       );
 
@@ -803,17 +842,12 @@ async function handleCallbackQuery(
     }
 
     // --------------------------------------
-    // عدد اشتباه
+    // اشتباه
     // --------------------------------------
 
     if (
       result.mistake
     ) {
-
-      /*
-       * بعد از اشتباه دوباره صفحه عددها
-       * نمایش داده می‌شود.
-       */
 
       await editMessageText(
         token,
@@ -836,12 +870,12 @@ async function handleCallbackQuery(
     // عدد صحیح
     // --------------------------------------
 
-    await editMessageText(
+    await updateSudokuPhoto(
       token,
-      message.chat.id,
-      message.message_id,
-      createBoardText(game),
-      buildSudokuKeyboard(game)
+      message,
+      game,
+      createBoardInfoText(game),
+      buildBlockKeyboard()
     );
 
     await answerCallbackQuery(
@@ -895,11 +929,11 @@ async function handleCallbackQuery(
       result.won
     ) {
 
-      await editMessageText(
+      await updateSudokuPhoto(
         token,
-        message.chat.id,
-        message.message_id,
-        createBoardText(game),
+        message,
+        game,
+        createBoardInfoText(game),
         buildFinishedKeyboard()
       );
 
@@ -912,20 +946,18 @@ async function handleCallbackQuery(
       return;
     }
 
-    await editMessageText(
+    await updateSudokuPhoto(
       token,
-      message.chat.id,
-      message.message_id,
-      createBoardText(game),
-      buildSudokuKeyboard(game)
+      message,
+      game,
+      createBoardInfoText(game),
+      buildBlockKeyboard()
     );
 
     await answerCallbackQuery(
       token,
       callbackId,
-      result.ok
-        ? result.message
-        : result.message
+      result.message
     );
 
     return;
@@ -951,16 +983,42 @@ async function handleCallbackQuery(
       freshGame
     );
 
-    await editGameMessage(
+    await updateSudokuPhoto(
       token,
       message,
-      freshGame
+      freshGame,
+      createBoardInfoText(freshGame),
+      buildBlockKeyboard()
     );
 
     await answerCallbackQuery(
       token,
       callbackId,
       "🔄 بازی جدید ساخته شد."
+    );
+
+    return;
+  }
+
+  // ========================================
+  // Back to blocks
+  // ========================================
+
+  if (
+    data === "action:blocks"
+  ) {
+
+    await editMessageText(
+      token,
+      message.chat.id,
+      message.message_id,
+      createBoardInfoText(game),
+      buildBlockKeyboard()
+    );
+
+    await answerCallbackQuery(
+      token,
+      callbackId
     );
 
     return;
@@ -974,10 +1032,12 @@ async function handleCallbackQuery(
     data === "action:board"
   ) {
 
-    await editGameMessage(
+    await editMessageText(
       token,
-      message,
-      game
+      message.chat.id,
+      message.message_id,
+      createBoardInfoText(game),
+      buildBlockKeyboard()
     );
 
     await answerCallbackQuery(
@@ -995,7 +1055,7 @@ async function handleCallbackQuery(
 }
 
 // ==========================================
-// نمایش بازی
+// ارسال بازی جدید
 // ==========================================
 
 async function sendGameMessage(
@@ -1004,179 +1064,94 @@ async function sendGameMessage(
   game
 ) {
 
-  await sendMessage(
+  const png =
+    await renderSudokuPNG(game);
+
+  await sendPhoto(
     token,
     chatId,
-    createBoardText(game),
-    buildSudokuKeyboard(game)
+    png,
+    createBoardInfoText(game),
+    buildBlockKeyboard()
   );
 }
 
 // ==========================================
-// ویرایش صفحه بازی
+// بروزرسانی تصویر Sudoku
 // ==========================================
 
-async function editGameMessage(
+async function updateSudokuPhoto(
   token,
   message,
-  game
+  game,
+  caption,
+  replyMarkup
 ) {
 
-  if (
-    game.status === "won"
-  ) {
+  /*
+   * پیام بازی جدید باید عکس باشد.
+   *
+   * در صورتی که پیام فعلی هنوز متن باشد،
+   * ابتدا پیام متن را ویرایش نمی‌کنیم.
+   */
+
+  const png =
+    await renderSudokuPNG(game);
+
+  try {
+
+    await editMessagePhoto(
+      token,
+      message.chat.id,
+      message.message_id,
+      png,
+      caption,
+      replyMarkup
+    );
+
+  } catch (error) {
+
+    /*
+     * اگر پیام فعلی عکس نباشد،
+     * آن را با یک پیام متنی جایگزین می‌کنیم.
+     *
+     * این حالت فقط برای بازی‌های قدیمی
+     * که قبل از نسخه تصویری ساخته شده‌اند
+     * اتفاق می‌افتد.
+     */
+
+    console.error(
+      "editMessagePhoto failed:",
+      error
+    );
 
     await editMessageText(
       token,
       message.chat.id,
       message.message_id,
-      createBoardText(game),
-      buildFinishedKeyboard()
+      caption,
+      replyMarkup
     );
-
-    return;
   }
-
-  await editMessageText(
-    token,
-    message.chat.id,
-    message.message_id,
-    createBoardText(game),
-    buildSudokuKeyboard(game)
-  );
 }
 
 // ==========================================
-// متن صفحه اعداد
+// متن اطلاعات بازی
 // ==========================================
 
-function createNumberScreenText(
+function createBoardInfoText(
   game
 ) {
-
-  const index =
-    game.selectedCell;
-
-  const row =
-    Math.floor(index / 9) + 1;
-
-  const col =
-    (index % 9) + 1;
-
-  const notes =
-    Array.isArray(
-      game.notes[index]
-    )
-      ? game.notes[index]
-      : [];
-
-  const current =
-    game.board[index];
 
   const lines = [
-    "🔢 <b>انتخاب عدد</b>",
+    "🧩 <b>Sudoku</b>",
     "",
-    `📍 خانه: سطر ${row}، ستون ${col}`,
-    `🔢 مقدار فعلی: ${current ?? "خالی"}`,
-    `✏️ Pencil: ${
-      notes.length
-        ? notes.join(" ")
-        : "—"
-    }`,
-    "",
-    game.pencilMode
-      ? "✏️ <b>حالت مداد فعال است</b>"
-      : "عدد موردنظر را انتخاب کن:"
+    `🎯 سطح: ${getDifficultyName(game.difficulty)}`,
+    `📊 پیشرفت: ${getProgress(game)}%`,
+    `❌ اشتباه: ${game.mistakes}`,
+    `💡 راهنمایی: ${game.hints}`,
+    ""
   ];
-
-  return lines.join("\n");
-}
-
-// ==========================================
-// متن جدول
-// ==========================================
-
-function createBoardText(
-  game
-) {
-
-  const lines = [];
-
-  lines.push(
-    "🧩 <b>Sudoku</b>"
-  );
-
-  lines.push(
-    `🎯 سطح: ${getDifficultyName(game.difficulty)}`
-  );
-
-  lines.push(
-    `📊 پیشرفت: ${getProgress(game)}%`
-  );
-
-  lines.push(
-    `❌ اشتباه: ${game.mistakes}`
-  );
-
-  lines.push(
-    `💡 راهنمایی: ${game.hints}`
-  );
-
-  lines.push("");
-
-  for (
-    let row = 0;
-    row < 9;
-    row++
-  ) {
-
-    const cells = [];
-
-    for (
-      let col = 0;
-      col < 9;
-      col++
-    ) {
-
-      const index =
-        row * 9 + col;
-
-      const value =
-        game.board[index];
-
-      let text;
-
-      if (
-        value !== null
-      ) {
-
-        text =
-          String(value);
-
-      } else {
-
-        const notes =
-          Array.isArray(
-            game.notes[index]
-          )
-            ? game.notes[index]
-            : [];
-
-        text =
-          notes.length
-            ? notes.join("")
-            : "·";
-      }
-
-      cells.push(text);
-    }
-
-    lines.push(
-      cells.join(" ")
-    );
-  }
-
-  lines.push("");
 
   if (
     game.status === "won"
@@ -1207,11 +1182,87 @@ function createBoardText(
   } else {
 
     lines.push(
-      "👆 یک خانه را انتخاب کن."
+      "👆 ابتدا یکی از بلوک‌های ۳×۳ را انتخاب کن."
     );
   }
 
   return lines.join("\n");
+}
+
+// ==========================================
+// انتخاب خانه
+// ==========================================
+
+function createCellSelectionText(
+  game,
+  block
+) {
+
+  const blockRow =
+    Math.floor(block / 3);
+
+  const blockCol =
+    block % 3;
+
+  const startRow =
+    blockRow * 3 + 1;
+
+  const startCol =
+    blockCol * 3 + 1;
+
+  return [
+    "🧩 <b>انتخاب خانه</b>",
+    "",
+    `📦 بلوک: ${block + 1}`,
+    `📍 سطرهای ${startRow} تا ${startRow + 2}`,
+    `📍 ستون‌های ${startCol} تا ${startCol + 2}`,
+    "",
+    "👆 یکی از خانه‌های این بلوک را انتخاب کن."
+  ].join("\n");
+}
+
+// ==========================================
+// صفحه انتخاب عدد
+// ==========================================
+
+function createNumberScreenText(
+  game
+) {
+
+  const index =
+    game.selectedCell;
+
+  const row =
+    Math.floor(index / 9) + 1;
+
+  const col =
+    (index % 9) + 1;
+
+  const notes =
+    Array.isArray(
+      game.notes[index]
+    )
+      ? game.notes[index]
+      : [];
+
+  const current =
+    game.board[index];
+
+  return [
+    "🔢 <b>انتخاب عدد</b>",
+    "",
+    `📍 خانه: سطر ${row}، ستون ${col}`,
+    `🔢 مقدار فعلی: ${current ?? "خالی"}`,
+    `✏️ یادداشت‌ها: ${
+      notes.length
+        ? notes.join(" ")
+        : "—"
+    }`,
+    "",
+    game.pencilMode
+      ? "✏️ <b>حالت مداد فعال است</b>"
+      : "عدد موردنظر را انتخاب کن:"
+  ].join("\n");
 }
 
 // ==========================================
@@ -1284,42 +1335,18 @@ async function saveGame(
     `)
     .bind(
       chatId,
-
       userId,
-
-      JSON.stringify(
-        game.puzzle
-      ),
-
-      JSON.stringify(
-        game.solution
-      ),
-
-      JSON.stringify(
-        game.board
-      ),
-
-      JSON.stringify(
-        game.notes
-      ),
-
+      JSON.stringify(game.puzzle),
+      JSON.stringify(game.solution),
+      JSON.stringify(game.board),
+      JSON.stringify(game.notes),
       game.selectedCell,
-
       game.difficulty,
-
       game.mistakes,
-
       game.hints,
-
-      game.pencilMode
-        ? 1
-        : 0,
-
+      game.pencilMode ? 1 : 0,
       game.status,
-
-      game.createdAt ||
-        now,
-
+      game.createdAt || now,
       now
     )
     .run();
@@ -1359,54 +1386,36 @@ async function loadGame(
   return {
 
     puzzle:
-      JSON.parse(
-        row.puzzle
-      ),
+      JSON.parse(row.puzzle),
 
     solution:
-      JSON.parse(
-        row.solution
-      ),
+      JSON.parse(row.solution),
 
     board:
-      JSON.parse(
-        row.board
-      ),
+      JSON.parse(row.board),
 
     notes:
-      JSON.parse(
-        row.notes
-      ),
+      JSON.parse(row.notes),
 
     selectedCell:
-      Number(
-        row.selected_cell
-      ),
+      Number(row.selected_cell),
 
     difficulty:
       row.difficulty,
 
     mistakes:
-      Number(
-        row.mistakes
-      ),
+      Number(row.mistakes),
 
     hints:
-      Number(
-        row.hints
-      ),
+      Number(row.hints),
 
     pencilMode:
-      Boolean(
-        row.pencil_mode
-      ),
+      Boolean(row.pencil_mode),
 
     status:
       row.status,
 
     createdAt:
-      Number(
-        row.created_at
-      )
-  }
+      Number(row.created_at)
+  };
 }
