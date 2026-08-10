@@ -1,9 +1,16 @@
 {
-  "name": "sudoku",
+  "name": "telegram-sudoku-cloudflare",
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
   "dependencies": {
-    "@cf-wasm/resvg": "^0.3.5"
+    "sudoku-core": "3.0.3"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
   }
 }
