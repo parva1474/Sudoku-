@@ -1,7 +1,7 @@
 // ==========================================
 // src/keyboard.js
-// Inline Keyboard سودوکو برای Telegram
-// نسخه کم‌عرض برای نمایش 9 ستون
+// Inline Keyboard Sudoku
+// نسخه تست حداقل عرض دکمه‌ها
 // ==========================================
 
 // ==========================================
@@ -11,43 +11,46 @@
 function getCellText(game, index) {
   const value = game.board[index];
 
-  // ----------------------------------------
-  // عدد واقعی
-  // ----------------------------------------
-
+  // اعداد به صورت SuperScript
+  // برای کم کردن عرض ظاهری دکمه
   if (value !== null) {
-    return String(value);
+    const tinyNumbers = {
+      1: "¹",
+      2: "²",
+      3: "³",
+      4: "⁴",
+      5: "⁵",
+      6: "⁶",
+      7: "⁷",
+      8: "⁸",
+      9: "⁹"
+    };
+
+    return tinyNumbers[value] || "·";
   }
 
-  // ----------------------------------------
   // Pencil
-  // ----------------------------------------
+  const notes = Array.isArray(game.notes[index])
+    ? game.notes[index]
+    : [];
 
-  const notes =
-    Array.isArray(game.notes[index])
-      ? game.notes[index]
-      : [];
-
+  // در حالت Pencil هم فقط یک کاراکتر
+  // نمایش داده می‌شود تا عرض دکمه زیاد نشود.
   if (notes.length > 0) {
-    return notes.join("");
+    return "·";
   }
 
+  // خانه خالی
   return "·";
 }
 
 // ==========================================
-// مشخص کردن خانه انتخاب‌شده
-// بدون اضافه کردن کاراکتر عریض
+// خانه انتخاب‌شده
 // ==========================================
 
-function markSelected(text) {
-  /*
-   * Combining Low Line
-   * عرض بسیار کمی دارد و تقریباً
-   * اندازه خود کاراکتر را تغییر نمی‌دهد.
-   */
-
-  return `${text}\u0332`;
+function markSelected() {
+  // فقط یک کاراکتر
+  return "•";
 }
 
 // ==========================================
@@ -61,34 +64,23 @@ export function buildSudokuKeyboard(game) {
     const line = [];
 
     for (let col = 0; col < 9; col++) {
-      const index =
-        row * 9 + col;
+      const index = row * 9 + col;
 
       let text =
         getCellText(game, index);
 
-      // ------------------------------------
       // خانه انتخاب‌شده
-      // ------------------------------------
-
-      if (
-        game.selectedCell === index
-      ) {
-        text =
-          markSelected(text);
+      if (game.selectedCell === index) {
+        text = markSelected();
       }
 
       /*
-       * خانه‌های اولیه دیگر 🔒 ندارند.
-       *
-       * علت:
-       * ایموجی قفل عرض دکمه را زیاد می‌کند
-       * و باعث می‌شود Telegram به جای 9 ستون،
-       * فقط 8 ستون نمایش دهد.
+       * عمداً هیچ Emoji یا فاصله‌ای
+       * در خانه‌های جدول استفاده نشده.
        */
 
       line.push({
-        text,
+        text: text,
 
         callback_data:
           `cell:${index}`
@@ -99,23 +91,21 @@ export function buildSudokuKeyboard(game) {
   }
 
   // ========================================
-  // کنترل‌های اصلی
+  // کنترل‌ها
   // ========================================
 
   keyboard.push([
     {
-      text:
-        game.pencilMode
-          ? "✏️ مداد روشن"
-          : "✏️ مداد خاموش",
+      text: game.pencilMode
+        ? "✏️ مداد روشن"
+        : "✏️ مداد خاموش",
 
       callback_data:
         "mode:pencil"
     },
 
     {
-      text:
-        "🧹 پاک کردن",
+      text: "🧹 پاک کردن",
 
       callback_data:
         "mode:erase"
@@ -124,16 +114,14 @@ export function buildSudokuKeyboard(game) {
 
   keyboard.push([
     {
-      text:
-        "💡 راهنمایی",
+      text: "💡 راهنمایی",
 
       callback_data:
         "action:hint"
     },
 
     {
-      text:
-        "🔄 بازی جدید",
+      text: "🔄 بازی جدید",
 
       callback_data:
         "action:new"
@@ -153,21 +141,15 @@ export function buildSudokuKeyboard(game) {
 export function buildNumberKeyboard(game) {
   const keyboard = [];
 
-  // ----------------------------------------
-  // اعداد 1 تا 9
-  // ----------------------------------------
-
   keyboard.push([
     {
       text: "1",
       callback_data: "num:1"
     },
-
     {
       text: "2",
       callback_data: "num:2"
     },
-
     {
       text: "3",
       callback_data: "num:3"
@@ -179,12 +161,10 @@ export function buildNumberKeyboard(game) {
       text: "4",
       callback_data: "num:4"
     },
-
     {
       text: "5",
       callback_data: "num:5"
     },
-
     {
       text: "6",
       callback_data: "num:6"
@@ -196,36 +176,32 @@ export function buildNumberKeyboard(game) {
       text: "7",
       callback_data: "num:7"
     },
-
     {
       text: "8",
       callback_data: "num:8"
     },
-
     {
       text: "9",
       callback_data: "num:9"
     }
   ]);
 
-  // ----------------------------------------
+  // ========================================
   // کنترل‌ها
-  // ----------------------------------------
+  // ========================================
 
   keyboard.push([
     {
-      text:
-        game.pencilMode
-          ? "✏️ مداد روشن"
-          : "✏️ مداد خاموش",
+      text: game.pencilMode
+        ? "✏️ مداد روشن"
+        : "✏️ مداد خاموش",
 
       callback_data:
         "mode:pencil"
     },
 
     {
-      text:
-        "🧹 پاک کردن",
+      text: "🧹 پاک کردن",
 
       callback_data:
         "mode:erase"
@@ -234,8 +210,7 @@ export function buildNumberKeyboard(game) {
 
   keyboard.push([
     {
-      text:
-        "⬅️ برگشت به جدول",
+      text: "⬅️ برگشت به جدول",
 
       callback_data:
         "action:board"
@@ -257,47 +232,32 @@ export function buildDifficultyKeyboard() {
     inline_keyboard: [
       [
         {
-          text:
-            "🟢 آسان",
-
-          callback_data:
-            "difficulty:easy"
+          text: "🟢 آسان",
+          callback_data: "difficulty:easy"
         },
 
         {
-          text:
-            "🟡 متوسط",
-
-          callback_data:
-            "difficulty:medium"
+          text: "🟡 متوسط",
+          callback_data: "difficulty:medium"
         }
       ],
 
       [
         {
-          text:
-            "🔴 سخت",
-
-          callback_data:
-            "difficulty:hard"
+          text: "🔴 سخت",
+          callback_data: "difficulty:hard"
         },
 
         {
-          text:
-            "🟣 خیلی سخت",
-
-          callback_data:
-            "difficulty:expert"
+          text: "🟣 خیلی سخت",
+          callback_data: "difficulty:expert"
         }
       ],
 
       [
         {
-          text:
-            "⚫ استاد",
-
-          callback_data:
-            "difficulty:master"
+          text: "⚫ استاد",
+          callback_data: "difficulty:master"
         }
       ]
     ]
@@ -305,7 +265,7 @@ export function buildDifficultyKeyboard() {
 }
 
 // ==========================================
-// کیبورد پایان بازی
+// پایان بازی
 // ==========================================
 
 export function buildFinishedKeyboard() {
@@ -313,11 +273,8 @@ export function buildFinishedKeyboard() {
     inline_keyboard: [
       [
         {
-          text:
-            "🔄 بازی جدید",
-
-          callback_data:
-            "action:new"
+          text: "🔄 بازی جدید",
+          callback_data: "action:new"
         }
       ]
     ]
