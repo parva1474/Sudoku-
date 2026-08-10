@@ -1,61 +1,158 @@
 // ==========================================
 // src/keyboard.js
-// تست خالص جدول 9×9
+// Telegram Inline Keyboards
+// Sudoku
 // ==========================================
 
-function getCellText(game, index) {
-  const value = game.board[index];
-
-  if (value !== null && value !== undefined) {
-    return String(value);
-  }
-
-  return "·";
-}
-
 // ==========================================
-// جدول Sudoku فقط
+// کیبورد انتخاب بلوک‌های 3×3
 // ==========================================
 
-export function buildSudokuKeyboard(game) {
-  const keyboard = [];
-
-  for (let row = 0; row < 9; row++) {
-    const line = [];
-
-    for (let col = 0; col < 9; col++) {
-      const index =
-        row * 9 + col;
-
-      let text =
-        getCellText(game, index);
-
-      // خانه انتخاب‌شده
-      if (game.selectedCell === index) {
-        text = `•`;
-      }
-
-      line.push({
-        text,
-        callback_data: `cell:${index}`
-      });
-    }
-
-    keyboard.push(line);
-  }
+export function buildBlockKeyboard() {
 
   return {
-    inline_keyboard: keyboard
+    inline_keyboard: [
+
+      [
+        {
+          text: "1️⃣",
+          callback_data: "block:0"
+        },
+        {
+          text: "2️⃣",
+          callback_data: "block:1"
+        },
+        {
+          text: "3️⃣",
+          callback_data: "block:2"
+        }
+      ],
+
+      [
+        {
+          text: "4️⃣",
+          callback_data: "block:3"
+        },
+        {
+          text: "5️⃣",
+          callback_data: "block:4"
+        },
+        {
+          text: "6️⃣",
+          callback_data: "block:5"
+        }
+      ],
+
+      [
+        {
+          text: "7️⃣",
+          callback_data: "block:6"
+        },
+        {
+          text: "8️⃣",
+          callback_data: "block:7"
+        },
+        {
+          text: "9️⃣",
+          callback_data: "block:8"
+        }
+      ],
+
+      [
+        {
+          text: "💡 راهنمایی",
+          callback_data: "action:hint"
+        },
+        {
+          text: "🔄 بازی جدید",
+          callback_data: "action:new"
+        }
+      ]
+    ]
   };
 }
 
 // ==========================================
-// کیبورد اعداد
+// کیبورد انتخاب خانه داخل یک بلوک
+// ==========================================
+
+export function buildCellKeyboard(block) {
+
+  const blockRow =
+    Math.floor(block / 3);
+
+  const blockCol =
+    block % 3;
+
+  const keyboard = [];
+
+  for (
+    let localRow = 0;
+    localRow < 3;
+    localRow++
+  ) {
+
+    const row = [];
+
+    for (
+      let localCol = 0;
+      localCol < 3;
+      localCol++
+    ) {
+
+      const rowIndex =
+        blockRow * 3 +
+        localRow;
+
+      const colIndex =
+        blockCol * 3 +
+        localCol;
+
+      const index =
+        rowIndex * 9 +
+        colIndex;
+
+      row.push({
+
+        text:
+          `${rowIndex + 1}×${colIndex + 1}`,
+
+        callback_data:
+          `cell:${index}`
+      });
+    }
+
+    keyboard.push(row);
+  }
+
+  // ----------------------------------------
+  // برگشت
+  // ----------------------------------------
+
+  keyboard.push([
+    {
+      text: "⬅️ برگشت به بلوک‌ها",
+
+      callback_data:
+        "action:blocks"
+    }
+  ]);
+
+  return {
+    inline_keyboard:
+      keyboard
+  };
+}
+
+// ==========================================
+// کیبورد انتخاب عدد
 // ==========================================
 
 export function buildNumberKeyboard(game) {
+
   return {
     inline_keyboard: [
+
       [
         {
           text: "1",
@@ -70,6 +167,7 @@ export function buildNumberKeyboard(game) {
           callback_data: "num:3"
         }
       ],
+
       [
         {
           text: "4",
@@ -84,6 +182,7 @@ export function buildNumberKeyboard(game) {
           callback_data: "num:6"
         }
       ],
+
       [
         {
           text: "7",
@@ -98,20 +197,42 @@ export function buildNumberKeyboard(game) {
           callback_data: "num:9"
         }
       ],
+
+      // --------------------------------------
+      // کنترل مداد و پاک کردن
+      // --------------------------------------
+
       [
         {
-          text: "✏️",
-          callback_data: "mode:pencil"
+          text:
+            game.pencilMode
+              ? "✏️ مداد روشن"
+              : "✏️ مداد خاموش",
+
+          callback_data:
+            "mode:pencil"
         },
+
         {
-          text: "🧹",
-          callback_data: "mode:erase"
+          text:
+            "🧹 پاک کردن",
+
+          callback_data:
+            "mode:erase"
         }
       ],
+
+      // --------------------------------------
+      // برگشت به جدول
+      // --------------------------------------
+
       [
         {
-          text: "⬅️",
-          callback_data: "action:board"
+          text:
+            "⬅️ برگشت به جدول",
+
+          callback_data:
+            "action:blocks"
         }
       ]
     ]
@@ -119,36 +240,52 @@ export function buildNumberKeyboard(game) {
 }
 
 // ==========================================
-// انتخاب درجه سختی
+// کیبورد درجه سختی
 // ==========================================
 
 export function buildDifficultyKeyboard() {
+
   return {
     inline_keyboard: [
+
       [
         {
           text: "🟢 آسان",
-          callback_data: "difficulty:easy"
+
+          callback_data:
+            "difficulty:easy"
         },
+
         {
           text: "🟡 متوسط",
-          callback_data: "difficulty:medium"
+
+          callback_data:
+            "difficulty:medium"
         }
       ],
+
       [
         {
           text: "🔴 سخت",
-          callback_data: "difficulty:hard"
+
+          callback_data:
+            "difficulty:hard"
         },
+
         {
           text: "🟣 خیلی سخت",
-          callback_data: "difficulty:expert"
+
+          callback_data:
+            "difficulty:expert"
         }
       ],
+
       [
         {
           text: "⚫ استاد",
-          callback_data: "difficulty:master"
+
+          callback_data:
+            "difficulty:master"
         }
       ]
     ]
@@ -156,16 +293,21 @@ export function buildDifficultyKeyboard() {
 }
 
 // ==========================================
-// پایان بازی
+// کیبورد پایان بازی
 // ==========================================
 
 export function buildFinishedKeyboard() {
+
   return {
     inline_keyboard: [
+
       [
         {
-          text: "🔄",
-          callback_data: "action:new"
+          text:
+            "🔄 بازی جدید",
+
+          callback_data:
+            "action:new"
         }
       ]
     ]
