@@ -1,12 +1,13 @@
 // ==========================================
 // src/sudoku-image.js
-// رندر جدول Sudoku به PNG
+// Sudoku Board Renderer
 // Cloudflare Workers + resvg
 // ==========================================
 
 import {
   Resvg
 } from "@cf-wasm/resvg/workerd";
+
 
 // ==========================================
 // تنظیمات تصویر
@@ -17,16 +18,20 @@ const IMAGE_SIZE = 540;
 const PADDING = 12;
 
 const BOARD_SIZE =
-  IMAGE_SIZE - (PADDING * 2);
+  IMAGE_SIZE -
+  (PADDING * 2);
 
 const CELL_SIZE =
   BOARD_SIZE / 9;
 
+
 // ==========================================
-// تبدیل عدد فارسی
+// تبدیل اعداد انگلیسی به فارسی
 // ==========================================
 
-function toPersianDigit(value) {
+function toPersianDigit(
+  value
+) {
 
   const digits = [
     "۰",
@@ -41,21 +46,23 @@ function toPersianDigit(value) {
     "۹"
   ];
 
-  return String(value)
-    .replace(
-      /[0-9]/g,
-      digit =>
-        digits[
-          Number(digit)
-        ]
-    );
+  return String(value).replace(
+    /[0-9]/g,
+    digit =>
+      digits[
+        Number(digit)
+      ]
+  );
 }
+
 
 // ==========================================
 // Escape برای SVG
 // ==========================================
 
-function escapeXML(value) {
+function escapeXML(
+  value
+) {
 
   return String(value)
     .replace(
@@ -80,24 +87,31 @@ function escapeXML(value) {
     );
 }
 
+
 // ==========================================
-// ساخت SVG جدول
+// ساخت SVG جدول سودوکو
 // ==========================================
 
-function buildSudokuSVG(game) {
+function buildSudokuSVG(
+  game
+) {
 
   const svg = [];
 
+
   svg.push(
-    `<svg xmlns="http://www.w3.org/2000/svg"
+    `<svg
+      xmlns="http://www.w3.org/2000/svg"
       width="${IMAGE_SIZE}"
       height="${IMAGE_SIZE}"
-      viewBox="0 0 ${IMAGE_SIZE} ${IMAGE_SIZE}">`
+      viewBox="0 0 ${IMAGE_SIZE} ${IMAGE_SIZE}"
+    >`
   );
 
-  // ----------------------------------------
-  // پس‌زمینه
-  // ----------------------------------------
+
+  // ========================================
+  // Background
+  // ========================================
 
   svg.push(`
     <rect
@@ -109,9 +123,10 @@ function buildSudokuSVG(game) {
     />
   `);
 
-  // ----------------------------------------
-  // خانه‌ها
-  // ----------------------------------------
+
+  // ========================================
+  // Cells
+  // ========================================
 
   for (
     let row = 0;
@@ -128,17 +143,20 @@ function buildSudokuSVG(game) {
       const index =
         row * 9 + col;
 
+
       const x =
         PADDING +
         col * CELL_SIZE;
+
 
       const y =
         PADDING +
         row * CELL_SIZE;
 
-      // ------------------------------------
-      // خانه انتخاب شده
-      // ------------------------------------
+
+      // ====================================
+      // خانه انتخاب‌شده
+      // ====================================
 
       if (
         game.selectedCell === index
@@ -155,38 +173,40 @@ function buildSudokuSVG(game) {
         `);
       }
 
-      // ------------------------------------
+
+      // ====================================
       // مقدار خانه
-      // ------------------------------------
+      // ====================================
 
       const value =
         game.board[index];
+
 
       if (
         value !== null &&
         value !== undefined
       ) {
 
-        const isFixed =
-          game.puzzle[index] !== null;
+        const fixed =
+          game.puzzle[index] !== null &&
+          game.puzzle[index] !== undefined;
 
-        const color =
-          isFixed
-            ? "#111827"
-            : "#2563eb";
 
         const fontSize =
           Math.floor(
             CELL_SIZE * 0.52
           );
 
+
         const centerX =
           x +
           CELL_SIZE / 2;
 
+
         const centerY =
           y +
           CELL_SIZE / 2;
+
 
         svg.push(`
           <text
@@ -197,7 +217,11 @@ function buildSudokuSVG(game) {
             font-family="Arial, sans-serif"
             font-size="${fontSize}px"
             font-weight="700"
-            fill="${color}"
+            fill="${
+              fixed
+                ? "#111827"
+                : "#2563eb"
+            }"
           >
             ${escapeXML(
               toPersianDigit(value)
@@ -207,25 +231,27 @@ function buildSudokuSVG(game) {
 
       } else {
 
-        // ----------------------------------
-        // Pencil
-        // ----------------------------------
+        // ==================================
+        // Pencil Notes
+        // ==================================
 
         const notes =
           Array.isArray(
-            game.notes[index]
+            game.notes?.[index]
           )
             ? game.notes[index]
             : [];
 
+
         if (
-          notes.length > 0
+          notes.length
         ) {
 
           const noteSize =
             Math.floor(
               CELL_SIZE * 0.19
             );
+
 
           for (
             let n = 1;
@@ -236,16 +262,20 @@ function buildSudokuSVG(game) {
             if (
               !notes.includes(n)
             ) {
+
               continue;
             }
+
 
             const noteRow =
               Math.floor(
                 (n - 1) / 3
               );
 
+
             const noteCol =
-                (n - 1) % 3;
+              (n - 1) % 3;
+
 
             const nx =
               x +
@@ -255,6 +285,7 @@ function buildSudokuSVG(game) {
                 noteCol * 0.30
               );
 
+
             const ny =
               y +
               CELL_SIZE *
@@ -262,6 +293,7 @@ function buildSudokuSVG(game) {
                 0.20 +
                 noteRow * 0.30
               );
+
 
             svg.push(`
               <text
@@ -284,11 +316,10 @@ function buildSudokuSVG(game) {
     }
   }
 
-  // ========================================
-  // خطوط جدول
-  // ========================================
 
-  // خطوط نازک داخلی
+  // ========================================
+  // خطوط نازک جدول
+  // ========================================
 
   for (
     let i = 0;
@@ -300,6 +331,9 @@ function buildSudokuSVG(game) {
       PADDING +
       i * CELL_SIZE;
 
+
+    // عمودی
+
     svg.push(`
       <line
         x1="${position}"
@@ -310,6 +344,9 @@ function buildSudokuSVG(game) {
         stroke-width="1"
       />
     `);
+
+
+    // افقی
 
     svg.push(`
       <line
@@ -323,9 +360,10 @@ function buildSudokuSVG(game) {
     `);
   }
 
-  // ----------------------------------------
-  // خطوط ضخیم 3×3
-  // ----------------------------------------
+
+  // ========================================
+  // خطوط ضخیم بلوک‌های 3×3
+  // ========================================
 
   for (
     let i = 0;
@@ -337,6 +375,9 @@ function buildSudokuSVG(game) {
       PADDING +
       i * CELL_SIZE;
 
+
+    // عمودی
+
     svg.push(`
       <line
         x1="${position}"
@@ -347,6 +388,9 @@ function buildSudokuSVG(game) {
         stroke-width="3"
       />
     `);
+
+
+    // افقی
 
     svg.push(`
       <line
@@ -360,6 +404,7 @@ function buildSudokuSVG(game) {
     `);
   }
 
+
   // ========================================
   // پایان SVG
   // ========================================
@@ -368,8 +413,10 @@ function buildSudokuSVG(game) {
     "</svg>"
   );
 
+
   return svg.join("");
 }
+
 
 // ==========================================
 // تبدیل SVG به PNG
@@ -380,20 +427,24 @@ export async function renderSudokuPNG(
 ) {
 
   const svg =
-    buildSudokuSVG(game);
+    buildSudokuSVG(
+      game
+    );
+
 
   const renderer =
-    new Resvg(svg, {
-      fitTo: {
-        mode: "width",
-        value: IMAGE_SIZE
+    new Resvg(
+      svg,
+      {
+        fitTo: {
+          mode: "width",
+          value: IMAGE_SIZE
+        }
       }
-    });
+    );
 
-  const png =
-    renderer
-      .render()
-      .asPng();
 
-  return png;
+  return renderer
+    .render()
+    .asPng();
 }
