@@ -11,7 +11,7 @@ import {
 } from "./telegram.js";
 
 import {
-  newGame,
+  createGame,
   selectCell,
   togglePencilMode,
   toggleNote,
@@ -22,7 +22,6 @@ import {
 } from "./game.js";
 
 import {
-  buildSudokuKeyboard,
   buildBlockKeyboard,
   buildCellKeyboard,
   buildNumberKeyboard,
@@ -40,8 +39,7 @@ import {
 // تنظیمات
 // ==========================================
 
-const DEFAULT_DIFFICULTY =
-  "medium";
+const DEFAULT_DIFFICULTY = "medium";
 
 const VALID_DIFFICULTIES = [
   "easy",
@@ -58,32 +56,19 @@ const VALID_DIFFICULTIES = [
 
 export default {
 
-  async fetch(
-    request,
-    env
-  ) {
+  async fetch(request, env) {
 
-    if (
-      request.method === "GET"
-    ) {
-
+    if (request.method === "GET") {
       return new Response(
         "🧩 Sudoku Bot is running.",
-        {
-          status: 200
-        }
+        { status: 200 }
       );
     }
 
-    if (
-      request.method !== "POST"
-    ) {
-
+    if (request.method !== "POST") {
       return new Response(
         "Method Not Allowed",
-        {
-          status: 405
-        }
+        { status: 405 }
       );
     }
 
@@ -103,20 +88,15 @@ export default {
 
         return new Response(
           "BOT_TOKEN is missing.",
-          {
-            status: 500
-          }
+          { status: 500 }
         );
       }
-
 
       // --------------------------------------
       // Message
       // --------------------------------------
 
-      if (
-        update.message
-      ) {
+      if (update.message) {
 
         await handleMessage(
           update.message,
@@ -125,14 +105,11 @@ export default {
         );
       }
 
-
       // --------------------------------------
       // Callback
       // --------------------------------------
 
-      if (
-        update.callback_query
-      ) {
+      if (update.callback_query) {
 
         await handleCallbackQuery(
           update.callback_query,
@@ -141,12 +118,9 @@ export default {
         );
       }
 
-
       return new Response(
         "OK",
-        {
-          status: 200
-        }
+        { status: 200 }
       );
 
     } catch (error) {
@@ -158,9 +132,7 @@ export default {
 
       return new Response(
         "Internal Server Error",
-        {
-          status: 500
-        }
+        { status: 500 }
       );
     }
   }
@@ -177,17 +149,12 @@ async function handleMessage(
   token
 ) {
 
-  if (
-    !message.chat
-  ) {
-
+  if (!message.chat) {
     return;
   }
 
   const chatId =
-    String(
-      message.chat.id
-    );
+    String(message.chat.id);
 
   const userId =
     String(
@@ -205,9 +172,7 @@ async function handleMessage(
   // /start
   // ========================================
 
-  if (
-    text === "/start"
-  ) {
+  if (text === "/start") {
 
     await sendWelcome(
       token,
@@ -222,9 +187,7 @@ async function handleMessage(
   // /new
   // ========================================
 
-  if (
-    text === "/new"
-  ) {
+  if (text === "/new") {
 
     await startNewGame(
       env,
@@ -244,26 +207,16 @@ async function handleMessage(
 
   const difficultyCommands = {
 
-    "/easy":
-      "easy",
+    "/easy": "easy",
+    "/medium": "medium",
+    "/hard": "hard",
+    "/expert": "expert",
+    "/master": "master"
 
-    "/medium":
-      "medium",
-
-    "/hard":
-      "hard",
-
-    "/expert":
-      "expert",
-
-    "/master":
-      "master"
   };
 
 
-  if (
-    difficultyCommands[text]
-  ) {
+  if (difficultyCommands[text]) {
 
     await startNewGame(
       env,
@@ -281,9 +234,7 @@ async function handleMessage(
   // /game
   // ========================================
 
-  if (
-    text === "/game"
-  ) {
+  if (text === "/game") {
 
     const game =
       await loadGame(
@@ -316,9 +267,7 @@ async function handleMessage(
   // /help
   // ========================================
 
-  if (
-    text === "/help"
-  ) {
+  if (text === "/help") {
 
     await sendHelp(
       token,
@@ -342,13 +291,9 @@ async function sendWelcome(
   const text = [
 
     "🧩 <b>Sudoku</b>",
-
     "",
-
     "به بازی سودوکو خوش آمدی!",
-
     "",
-
     "درجه سختی را انتخاب کن:"
 
   ].join("\n");
@@ -375,27 +320,16 @@ async function sendHelp(
   const text = [
 
     "🧩 <b>راهنمای Sudoku</b>",
-
     "",
-
     "👆 ابتدا یکی از ۹ بلوک را انتخاب کن.",
-
     "🔲 سپس خانه موردنظر را انتخاب کن.",
-
     "🔢 بعد عدد موردنظر را انتخاب کن.",
-
     "✏️ برای Pencil حالت مداد را روشن کن.",
-
     "🧹 برای پاک کردن عدد استفاده کن.",
-
     "💡 راهنمایی یک حرکت درست انجام می‌دهد.",
-
     "",
-
     "🔒 خانه‌های اولیه قابل تغییر نیستند.",
-
     "",
-
     "👥 بازی در گروه قابل انجام است."
 
   ].join("\n");
@@ -406,6 +340,62 @@ async function sendHelp(
     chatId,
     text
   );
+}
+
+
+// ==========================================
+// آماده‌سازی Game
+// ==========================================
+
+function normalizeGame(game) {
+
+  if (!game) {
+    return null;
+  }
+
+  if (
+    !Array.isArray(game.notes) ||
+    game.notes.length !== 81
+  ) {
+
+    game.notes =
+      Array.from(
+        { length: 81 },
+        () => []
+      );
+  }
+
+  for (
+    let i = 0;
+    i < 81;
+    i++
+  ) {
+
+    if (
+      !Array.isArray(
+        game.notes[i]
+      )
+    ) {
+
+      game.notes[i] = [];
+    }
+  }
+
+  if (
+    !Number.isInteger(
+      game.selectedCell
+    )
+  ) {
+
+    game.selectedCell = -1;
+  }
+
+  game.pencilMode =
+    Boolean(
+      game.pencilMode
+    );
+
+  return game;
 }
 
 
@@ -459,10 +449,12 @@ async function startNewGame(
 
 
   const game =
-    newGame(
-      difficulty,
-      generated.puzzle,
-      generated.solution
+    normalizeGame(
+      createGame(
+        difficulty,
+        generated.puzzle,
+        generated.solution
+      )
     );
 
 
@@ -498,10 +490,6 @@ async function sendGameMessage(
     );
 
 
-  // ----------------------------------------
-  // اول بلوک‌ها
-  // ----------------------------------------
-
   await sendMessage(
     token,
     chatId,
@@ -514,7 +502,7 @@ async function sendGameMessage(
 
 
 // ==========================================
-// ویرایش پیام بازی
+// ویرایش صفحه بازی
 // ==========================================
 
 async function editGameMessage(
@@ -522,6 +510,10 @@ async function editGameMessage(
   message,
   game
 ) {
+
+  game =
+    normalizeGame(game);
+
 
   if (
     game.status === "won"
@@ -651,10 +643,12 @@ async function handleCallbackQuery(
 
 
     const game =
-      newGame(
-        difficulty,
-        generated.puzzle,
-        generated.solution
+      normalizeGame(
+        createGame(
+          difficulty,
+          generated.puzzle,
+          generated.solution
+        )
       );
 
 
@@ -688,9 +682,11 @@ async function handleCallbackQuery(
   // ========================================
 
   const game =
-    await loadGame(
-      env,
-      chatId
+    normalizeGame(
+      await loadGame(
+        env,
+        chatId
+      )
     );
 
 
@@ -793,11 +789,6 @@ async function handleCallbackQuery(
     data === "action:cells"
   ) {
 
-    /*
-     * اگر خانه‌ای قبلاً انتخاب شده باشد،
-     * بلوک مربوط به آن را باز می‌کنیم.
-     */
-
     const selected =
       Number(
         game.selectedCell
@@ -888,13 +879,26 @@ async function handleCallbackQuery(
 
 
     // --------------------------------------
-    // انتخاب خانه برای همین بازیکن
+    // انتخاب خانه
     // --------------------------------------
 
-    selectCell(
-      game,
-      index
-    );
+    const selected =
+      selectCell(
+        game,
+        index
+      );
+
+
+    if (!selected.ok) {
+
+      await answerCallbackQuery(
+        token,
+        callbackId,
+        selected.message
+      );
+
+      return;
+    }
 
 
     await saveGame(
@@ -918,7 +922,7 @@ async function handleCallbackQuery(
         token,
         message.chat.id,
         message.message_id,
-        createBoardText(game),
+        createNumberScreenText(game),
         buildNumberKeyboard(game)
       );
 
@@ -963,9 +967,10 @@ async function handleCallbackQuery(
     data === "mode:pencil"
   ) {
 
-    togglePencilMode(
-      game
-    );
+    const enabled =
+      togglePencilMode(
+        game
+      );
 
 
     await saveGame(
@@ -988,7 +993,7 @@ async function handleCallbackQuery(
     await answerCallbackQuery(
       token,
       callbackId,
-      game.pencilMode
+      enabled
         ? "✏️ مداد روشن شد."
         : "✏️ مداد خاموش شد."
     );
@@ -1005,24 +1010,10 @@ async function handleCallbackQuery(
     data === "mode:erase"
   ) {
 
-    if (
-      game.selectedCell === -1
-    ) {
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "اول یک خانه انتخاب کن."
-      );
-
-      return;
-    }
-
-
     const result =
       eraseNumber(
         game,
-        game.selectedCell
+        game
       );
 
 
@@ -1053,10 +1044,11 @@ async function handleCallbackQuery(
 
     return;
   }
-  
-  // ==========================================
-// Number
-// ==========================================
+
+
+  // ========================================
+  // Number
+  // ========================================
 
   if (
     data.startsWith(
@@ -1100,13 +1092,9 @@ async function handleCallbackQuery(
     }
 
 
-    const index =
-      game.selectedCell;
-
-
-    // ----------------------------------------
+    // --------------------------------------
     // Pencil
-    // ----------------------------------------
+    // --------------------------------------
 
     if (
       game.pencilMode
@@ -1152,14 +1140,14 @@ async function handleCallbackQuery(
     }
 
 
-    // ----------------------------------------
+    // --------------------------------------
     // عدد اصلی
-    // ----------------------------------------
+    // --------------------------------------
 
     const result =
       putNumber(
         game,
-        index,
+        game,
         number
       );
 
@@ -1172,9 +1160,9 @@ async function handleCallbackQuery(
     );
 
 
-    // ----------------------------------------
+    // --------------------------------------
     // برنده
-    // ----------------------------------------
+    // --------------------------------------
 
     if (
       result.won
@@ -1199,9 +1187,9 @@ async function handleCallbackQuery(
     }
 
 
-    // ----------------------------------------
+    // --------------------------------------
     // اشتباه
-    // ----------------------------------------
+    // --------------------------------------
 
     if (
       result.mistake
@@ -1226,9 +1214,9 @@ async function handleCallbackQuery(
     }
 
 
-    // ----------------------------------------
+    // --------------------------------------
     // درست
-    // ----------------------------------------
+    // --------------------------------------
 
     await editMessageText(
       token,
@@ -1249,16 +1237,15 @@ async function handleCallbackQuery(
   }
 
 
-// ==========================================
-// Hint
-// ==========================================
+  // ========================================
+  // Hint
+  // ========================================
 
   if (
     data === "action:hint"
   ) {
 
-    let hintResult =
-      null;
+    let hintResult = null;
 
 
     try {
@@ -1278,9 +1265,7 @@ async function handleCallbackQuery(
     }
 
 
-    if (
-      !hintResult
-    ) {
+    if (!hintResult) {
 
       await answerCallbackQuery(
         token,
@@ -1295,7 +1280,7 @@ async function handleCallbackQuery(
     const result =
       applyHint(
         game,
-        game.selectedCell,
+        game,
         hintResult.index,
         hintResult.number
       );
@@ -1351,25 +1336,47 @@ async function handleCallbackQuery(
   }
 
 
-// ==========================================
-// New Game
-// ==========================================
+  // ========================================
+  // New Game
+  // ========================================
 
   if (
     data === "action:new"
   ) {
 
-    const freshGenerated =
-      generateSudoku(
-        game.difficulty
+    let freshGenerated;
+
+    try {
+
+      freshGenerated =
+        generateSudoku(
+          game.difficulty
+        );
+
+    } catch (error) {
+
+      console.error(
+        "New game generation error:",
+        error
       );
+
+      await answerCallbackQuery(
+        token,
+        callbackId,
+        "❌ ساخت بازی جدید ناموفق بود."
+      );
+
+      return;
+    }
 
 
     const freshGame =
-      newGame(
-        game.difficulty,
-        freshGenerated.puzzle,
-        freshGenerated.solution
+      normalizeGame(
+        createGame(
+          game.difficulty,
+          freshGenerated.puzzle,
+          freshGenerated.solution
+        )
       );
 
 
@@ -1398,9 +1405,9 @@ async function handleCallbackQuery(
   }
 
 
-// ==========================================
-// Unknown callback
-// ==========================================
+  // ========================================
+  // Unknown callback
+  // ========================================
 
   await answerCallbackQuery(
     token,
@@ -1419,11 +1426,9 @@ function createBoardText(
 
   const lines = [];
 
-
   lines.push(
     "🧩 <b>Sudoku</b>"
   );
-
 
   lines.push(
     `🎯 سطح: ${getDifficultyName(
@@ -1431,34 +1436,20 @@ function createBoardText(
     )}`
   );
 
-
   lines.push(
-    `📊 پیشرفت: ${
-      getProgress(game)
-    }%`
+    `📊 پیشرفت: ${getProgress(game)}%`
   );
 
-
   lines.push(
-    `❌ اشتباه: ${
-      game.mistakes || 0
-    }`
+    `❌ اشتباه: ${game.mistakes || 0}`
   );
 
-
   lines.push(
-    `💡 راهنمایی: ${
-      game.hints || 0
-    }`
+    `💡 راهنمایی: ${game.hints || 0}`
   );
-
 
   lines.push("");
 
-
-  // ----------------------------------------
-  // نمایش جدول متنی
-  // ----------------------------------------
 
   for (
     let row = 0;
@@ -1467,7 +1458,6 @@ function createBoardText(
   ) {
 
     const cells = [];
-
 
     for (
       let col = 0;
@@ -1478,51 +1468,24 @@ function createBoardText(
       const index =
         row * 9 + col;
 
-
       const value =
         game.board[index];
 
-
-      let text;
-
-
-      if (
+      cells.push(
         value !== null &&
         value !== undefined
-      ) {
-
-        text =
-          String(value);
-
-      } else {
-
-        text =
-          "·";
-      }
-
-
-      cells.push(
-        text
+          ? String(value)
+          : "·"
       );
     }
 
 
-    // --------------------------------------
-    // جداکننده 3×3
-    // --------------------------------------
-
     lines.push(
-      cells
-        .slice(0, 3)
-        .join(" ") +
+      cells.slice(0, 3).join(" ") +
       " │ " +
-      cells
-        .slice(3, 6)
-        .join(" ") +
+      cells.slice(3, 6).join(" ") +
       " │ " +
-      cells
-        .slice(6, 9)
-        .join(" ")
+      cells.slice(6, 9).join(" ")
     );
 
 
@@ -1557,9 +1520,7 @@ function createBoardText(
   }
 
 
-  return lines.join(
-    "\n"
-  );
+  return lines.join("\n");
 }
 
 
@@ -1592,20 +1553,13 @@ function createNumberScreenText(
 
 
   const row =
-    Math.floor(
-      index / 9
-    ) + 1;
-
+    Math.floor(index / 9) + 1;
 
   const col =
-    (
-      index % 9
-    ) + 1;
-
+    (index % 9) + 1;
 
   const value =
     game.board[index];
-
 
   const notes =
     Array.isArray(
@@ -1653,20 +1607,15 @@ function getDifficultyName(
 
   const names = {
 
-    easy:
-      "🟢 آسان",
+    easy: "🟢 آسان",
 
-    medium:
-      "🟡 متوسط",
+    medium: "🟡 متوسط",
 
-    hard:
-      "🔴 سخت",
+    hard: "🔴 سخت",
 
-    expert:
-      "🟣 خیلی سخت",
+    expert: "🟣 خیلی سخت",
 
-    master:
-      "⚫ استاد"
+    master: "⚫ استاد"
 
   };
 
@@ -1689,9 +1638,7 @@ async function saveGame(
   game
 ) {
 
-  if (
-    !env.DB
-  ) {
+  if (!env.DB) {
 
     throw new Error(
       "D1 binding DB is missing."
@@ -1702,11 +1649,6 @@ async function saveGame(
   const now =
     Date.now();
 
-
-  /*
-   * این ساختار با جدول games
-   * نسخه فعلی پروژه کار می‌کند.
-   */
 
   await env.DB
     .prepare(`
@@ -1792,9 +1734,7 @@ async function loadGame(
   chatId
 ) {
 
-  if (
-    !env.DB
-  ) {
+  if (!env.DB) {
 
     throw new Error(
       "D1 binding DB is missing."
@@ -1816,29 +1756,29 @@ async function loadGame(
       .first();
 
 
-  if (
-    !row
-  ) {
-
+  if (!row) {
     return null;
   }
 
 
-  return {
+  const game = {
 
     puzzle:
-      JSON.parse(
-        row.puzzle
+      safeJSON(
+        row.puzzle,
+        []
       ),
 
     solution:
-      JSON.parse(
-        row.solution
+      safeJSON(
+        row.solution,
+        []
       ),
 
     board:
-      JSON.parse(
-        row.board
+      safeJSON(
+        row.board,
+        []
       ),
 
     notes:
@@ -1853,7 +1793,8 @@ async function loadGame(
       ),
 
     difficulty:
-      row.difficulty,
+      row.difficulty ||
+      DEFAULT_DIFFICULTY,
 
     mistakes:
       Number(
@@ -1871,7 +1812,8 @@ async function loadGame(
       ),
 
     status:
-      row.status,
+      row.status ||
+      "playing",
 
     createdAt:
       Number(
@@ -1883,6 +1825,11 @@ async function loadGame(
         row.updated_at || 0
       )
   };
+
+
+  return normalizeGame(
+    game
+  );
 }
 
 
@@ -1906,6 +1853,14 @@ function safeJSON(
     }
 
 
+    if (
+      typeof value !== "string"
+    ) {
+
+      return value;
+    }
+
+
     return JSON.parse(
       value
     );
@@ -1914,4 +1869,4 @@ function safeJSON(
 
     return fallback;
   }
-}
+        }
