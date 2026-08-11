@@ -226,6 +226,138 @@ export async function sendPhoto(
 
   return data.result;
 }
+
+
+// ==========================================
+// Edit Message Photo
+// ==========================================
+
+export async function editMessagePhoto(
+  token,
+  chatId,
+  messageId,
+  photo,
+  caption = "",
+  replyMarkup = null
+) {
+
+  const formData =
+    new FormData();
+
+  formData.append(
+    "chat_id",
+    String(chatId)
+  );
+
+  formData.append(
+    "message_id",
+    String(messageId)
+  );
+
+  if (caption) {
+
+    formData.append(
+      "caption",
+      String(caption)
+    );
+
+  }
+
+  formData.append(
+    "parse_mode",
+    "HTML"
+  );
+
+
+  if (replyMarkup) {
+
+    formData.append(
+      "reply_markup",
+      JSON.stringify(replyMarkup)
+    );
+
+  }
+
+
+  if (
+    photo instanceof Blob
+  ) {
+
+    formData.append(
+      "photo",
+      photo,
+      "sudoku.png"
+    );
+
+  } else if (
+    typeof photo === "string"
+  ) {
+
+    formData.append(
+      "photo",
+      photo
+    );
+
+  }
+
+
+  const url =
+    `https://api.telegram.org/bot${token}/editMessagePhoto`;
+
+
+  const response =
+    await fetch(
+      url,
+      {
+        method: "POST",
+        body: formData
+      }
+    );
+
+
+  let data;
+
+  try {
+
+    data =
+      await response.json();
+
+  } catch {
+
+    throw new Error(
+      `Telegram returned invalid JSON. HTTP ${response.status}`
+    );
+
+  }
+
+
+  if (
+    !response.ok ||
+    !data.ok
+  ) {
+
+    const description =
+      data?.description ||
+      `HTTP ${response.status}`;
+
+
+    console.error(
+      "Telegram editMessagePhoto error:",
+      description
+    );
+
+
+    throw new Error(
+      `Telegram API error: ${description}`
+    );
+
+  }
+
+
+  return data.result;
+}
+
+
 // ==========================================
 // Send Message
 // ==========================================
