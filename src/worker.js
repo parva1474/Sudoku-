@@ -2,7 +2,7 @@
 // src/worker.js
 // Telegram Sudoku Bot
 // Cloudflare Workers + D1
-// جدول Sudoku به صورت PNG
+// Multiplayer Architecture
 // ==========================================
 
 import {
@@ -92,6 +92,10 @@ export default {
         );
       }
 
+      // --------------------------------------
+      // پیام معمولی
+      // --------------------------------------
+
       if (update.message) {
 
         await handleMessage(
@@ -100,6 +104,10 @@ export default {
           token
         );
       }
+
+      // --------------------------------------
+      // Callback
+      // --------------------------------------
 
       if (update.callback_query) {
 
@@ -144,9 +152,12 @@ async function handleMessage(
   const chatId =
     String(message.chat.id);
 
+  const user =
+    message.from || {};
+
   const userId =
     String(
-      message.from?.id ??
+      user.id ??
       message.chat.id
     );
 
@@ -175,11 +186,11 @@ async function handleMessage(
 
   if (text === "/new") {
 
-    await startNewGame(
+    await createMultiplayerGame(
       env,
       token,
       chatId,
-      userId,
+      user,
       DEFAULT_DIFFICULTY
     );
 
@@ -187,7 +198,7 @@ async function handleMessage(
   }
 
   // ========================================
-  // Difficulty
+  // Difficulty commands
   // ========================================
 
   const difficultyCommands = {
@@ -207,11 +218,11 @@ async function handleMessage(
     difficultyCommands[text]
   ) {
 
-    await startNewGame(
+    await createMultiplayerGame(
       env,
       token,
       chatId,
-      userId,
+      user,
       difficultyCommands[text]
     );
 
@@ -225,7 +236,7 @@ async function handleMessage(
   if (text === "/game") {
 
     const game =
-      await loadGame(
+      await getActiveGame(
         env,
         chatId
       );
@@ -235,7 +246,7 @@ async function handleMessage(
       await sendMessage(
         token,
         chatId,
-        "هنوز بازی فعالی نداری.\n\nبرای شروع /new را بزن."
+        "هنوز بازی فعالی وجود ندارد.\n\nبرای شروع /new را بزن."
       );
 
       return;
@@ -245,6 +256,44 @@ async function handleMessage(
       token,
       chatId,
       game
+    );
+
+    return;
+  }
+
+  // ========================================
+  // /join
+  // ========================================
+
+  if (text === "/join") {
+
+    const game =
+      await getActiveGame(
+        env,
+        chatId
+      );
+
+    if (!game) {
+
+      await sendMessage(
+        token,
+        chatId,
+        "❌ بازی فعالی وجود ندارد."
+      );
+
+      return;
+    }
+
+    await addPlayer(
+      env,
+      game.id,
+      user
+    );
+
+    await sendMessage(
+      token,
+      chatId,
+      `👤 ${getUserName(user)} وارد بازی شد.`
     );
 
     return;
@@ -275,11 +324,17 @@ async function sendWelcome(
 ) {
 
   const text = [
-    "🧩 <b>Sudoku</b>",
+    "🧩 <b>Sudoku Multiplayer</b>",
     "",
-    "به بازی سودوکو خوش آمدی!",
+    "سودوکوی چندنفره داخل گروه.",
     "",
-    "درجه سختی را انتخاب کن:"
+    "برای شروع:",
+    "/new",
+    "",
+    "بازیکنان دیگر می‌توانند:",
+    "/join",
+    "",
+    "را بزنند."
   ].join("\n");
 
   await sendMessage(
@@ -302,13 +357,13 @@ async function sendHelp(
   const text = [
     "🧩 <b>راهنمای Sudoku</b>",
     "",
-    "👆 خانه موردنظر را انتخاب کن.",
-    "🔢 سپس عدد را انتخاب کن.",
-    "✏️ برای یادداشت از حالت مداد استفاده کن.",
-    "🧹 برای پاک کردن عدد استفاده کن.",
-    "💡 راهنمایی یک حرکت درست انجام می‌دهد.",
+    "/new — بازی جدید",
+    "/join — ورود به بازی",
+    "/game — نمایش بازی",
     "",
-    "🔒 خانه‌های اولیه قابل تغییر نیستند."
+    "👥 بازی می‌تواند چندنفره باشد.",
+    "🧩 جدول بین بازیکنان مشترک است.",
+    "👤 وضعیت هر بازیکن جداگانه ذخیره می‌شود."
   ].join("\n");
 
   await sendMessage(
@@ -319,14 +374,14 @@ async function sendHelp(
 }
 
 // ==========================================
-// شروع بازی
+// ساخت بازی چندنفره
 // ==========================================
 
-async function startNewGame(
+async function createMultiplayerGame(
   env,
   token,
   chatId,
-  userId,
+  user,
   difficulty
 ) {
 
@@ -340,11 +395,42 @@ async function startNewGame(
       DEFAULT_DIFFICULTY;
   }
 
-  let game;
+  // ----------------------------------------
+  // اگر بازی فعال وجود دارد
+  // ----------------------------------------
+
+  const existing =
+    await getActiveGame(
+      env,
+      chatId
+    );
+
+  if (existing) {
+
+    await addPlayer(
+      env,
+      existing.id,
+      user
+    );
+
+    await sendMessage(
+      token,
+      chatId,
+      "⚠️ یک بازی فعال از قبل وجود دارد.\n\nشما به بازی اضافه شدید."
+    );
+
+    return;
+  }
+
+  // ----------------------------------------
+  // ساخت Sudoku
+  // ----------------------------------------
+
+  let sudoku;
 
   try {
 
-    game =
+    sudoku =
       newGame(difficulty);
 
   } catch (error) {
@@ -363,12 +449,79 @@ async function startNewGame(
     return;
   }
 
-  await saveGame(
+  const now =
+    Date.now();
+
+  const gameId =
+    crypto.randomUUID();
+
+  // ----------------------------------------
+  // ذخیره بازی
+  // ----------------------------------------
+
+  await env.DB
+    .prepare(`
+      INSERT INTO games (
+        id,
+        chat_id,
+        puzzle,
+        solution,
+        board,
+        difficulty,
+        status,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    .bind(
+
+      gameId,
+
+      chatId,
+
+      JSON.stringify(
+        sudoku.puzzle
+      ),
+
+      JSON.stringify(
+        sudoku.solution
+      ),
+
+      JSON.stringify(
+        sudoku.board
+      ),
+
+      difficulty,
+
+      "playing",
+
+      now,
+
+      now
+
+    )
+    .run();
+
+  // ----------------------------------------
+  // سازنده بازی
+  // ----------------------------------------
+
+  await addPlayer(
     env,
-    chatId,
-    userId,
-    game
+    gameId,
+    user
   );
+
+  // ----------------------------------------
+  // دریافت بازی
+  // ----------------------------------------
+
+  const game =
+    await getGame(
+      env,
+      gameId
+    );
 
   await sendGamePhoto(
     token,
@@ -378,7 +531,338 @@ async function startNewGame(
 }
 
 // ==========================================
-// ارسال عکس جدول
+// افزودن بازیکن
+// ==========================================
+
+async function addPlayer(
+  env,
+  gameId,
+  user
+) {
+
+  const now =
+    Date.now();
+
+  const userId =
+    String(user.id);
+
+  const username =
+    user.username ||
+    null;
+
+  const firstName =
+    user.first_name ||
+    null;
+
+  await env.DB
+    .prepare(`
+      INSERT OR IGNORE INTO players (
+        game_id,
+        user_id,
+        username,
+        first_name,
+        selected_cell,
+        notes,
+        mistakes,
+        hints,
+        pencil_mode,
+        score,
+        joined_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, -1, '[]', 0, 0, 0, 0, ?, ?)
+    `)
+    .bind(
+
+      gameId,
+
+      userId,
+
+      username,
+
+      firstName,
+
+      now,
+
+      now
+
+    )
+    .run();
+}
+
+// ==========================================
+// گرفتن بازی فعال گروه
+// ==========================================
+
+async function getActiveGame(
+  env,
+  chatId
+) {
+
+  const row =
+    await env.DB
+      .prepare(`
+        SELECT *
+        FROM games
+        WHERE chat_id = ?
+        AND status = 'playing'
+        ORDER BY created_at DESC
+        LIMIT 1
+      `)
+      .bind(chatId)
+      .first();
+
+  if (!row) {
+    return null;
+  }
+
+  return buildGameObject(row);
+}
+
+// ==========================================
+// گرفتن بازی بر اساس ID
+// ==========================================
+
+async function getGame(
+  env,
+  gameId
+) {
+
+  const row =
+    await env.DB
+      .prepare(`
+        SELECT *
+        FROM games
+        WHERE id = ?
+        LIMIT 1
+      `)
+      .bind(gameId)
+      .first();
+
+  if (!row) {
+    return null;
+  }
+
+  return buildGameObject(row);
+}
+
+// ==========================================
+// تبدیل رکورد D1 به Game
+// ==========================================
+
+function buildGameObject(
+  row
+) {
+
+  return {
+
+    id:
+      row.id,
+
+    chatId:
+      row.chat_id,
+
+    messageId:
+      row.message_id,
+
+    puzzle:
+      JSON.parse(
+        row.puzzle
+      ),
+
+    solution:
+      JSON.parse(
+        row.solution
+      ),
+
+    board:
+      JSON.parse(
+        row.board
+      ),
+
+    difficulty:
+      row.difficulty,
+
+    status:
+      row.status,
+
+    createdAt:
+      Number(
+        row.created_at
+      ),
+
+    updatedAt:
+      Number(
+        row.updated_at
+      )
+  };
+}
+
+// ==========================================
+// دریافت وضعیت بازیکن
+// ==========================================
+
+async function getPlayer(
+  env,
+  gameId,
+  userId
+) {
+
+  const row =
+    await env.DB
+      .prepare(`
+        SELECT *
+        FROM players
+        WHERE game_id = ?
+        AND user_id = ?
+        LIMIT 1
+      `)
+      .bind(
+        gameId,
+        String(userId)
+      )
+      .first();
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+
+    id:
+      row.id,
+
+    gameId:
+      row.game_id,
+
+    userId:
+      row.user_id,
+
+    username:
+      row.username,
+
+    firstName:
+      row.first_name,
+
+    selectedCell:
+      Number(
+        row.selected_cell
+      ),
+
+    notes:
+      JSON.parse(
+        row.notes || "[]"
+      ),
+
+    mistakes:
+      Number(
+        row.mistakes
+      ),
+
+    hints:
+      Number(
+        row.hints
+      ),
+
+    pencilMode:
+      Boolean(
+        row.pencil_mode
+      ),
+
+    score:
+      Number(
+        row.score
+      )
+  };
+}
+
+// ==========================================
+// ذخیره وضعیت بازیکن
+// ==========================================
+
+async function savePlayer(
+  env,
+  player
+) {
+
+  await env.DB
+    .prepare(`
+      UPDATE players
+      SET
+        selected_cell = ?,
+        notes = ?,
+        mistakes = ?,
+        hints = ?,
+        pencil_mode = ?,
+        score = ?,
+        updated_at = ?
+      WHERE game_id = ?
+      AND user_id = ?
+    `)
+    .bind(
+
+      player.selectedCell,
+
+      JSON.stringify(
+        player.notes
+      ),
+
+      player.mistakes,
+
+      player.hints,
+
+      player.pencilMode
+        ? 1
+        : 0,
+
+      player.score,
+
+      Date.now(),
+
+      player.gameId,
+
+      player.userId
+
+    )
+    .run();
+}
+
+// ==========================================
+// ذخیره جدول مشترک
+// ==========================================
+
+async function saveBoard(
+  env,
+  game
+) {
+
+  await env.DB
+    .prepare(`
+      UPDATE games
+      SET
+        board = ?,
+        status = ?,
+        updated_at = ?
+      WHERE id = ?
+    `)
+    .bind(
+
+      JSON.stringify(
+        game.board
+      ),
+
+      game.status,
+
+      Date.now(),
+
+      game.id
+
+    )
+    .run();
+}
+
+// ==========================================
+// ارسال عکس Sudoku
 // ==========================================
 
 async function sendGamePhoto(
@@ -391,19 +875,54 @@ async function sendGamePhoto(
     await renderSudokuPNG(game);
 
   const caption =
-    createBoardCaption(game);
+    createCaption(game);
+
+  const keyboard =
+    buildNumberKeyboard(game);
 
   await sendPhoto(
     token,
     chatId,
     png,
     caption,
-    buildNumberKeyboard(game)
+    keyboard
   );
 }
 
 // ==========================================
-// Callback Handler
+// ویرایش عکس Sudoku
+// ==========================================
+
+async function editGamePhoto(
+  token,
+  message,
+  game,
+  finished = false
+) {
+
+  const png =
+    await renderSudokuPNG(game);
+
+  const caption =
+    createCaption(game);
+
+  const keyboard =
+    finished
+      ? buildFinishedKeyboard()
+      : buildNumberKeyboard(game);
+
+  await editMessagePhoto(
+    token,
+    message.chat.id,
+    message.message_id,
+    png,
+    caption,
+    keyboard
+  );
+}
+
+// ==========================================
+// Callback
 // ==========================================
 
 async function handleCallbackQuery(
@@ -412,9 +931,6 @@ async function handleCallbackQuery(
   token
 ) {
 
-  const callbackId =
-    callback.id;
-
   const message =
     callback.message;
 
@@ -422,85 +938,34 @@ async function handleCallbackQuery(
 
     await answerCallbackQuery(
       token,
-      callbackId
+      callback.id
     );
 
     return;
   }
 
   const chatId =
-    String(message.chat.id);
-
-  const userId =
     String(
-      callback.from?.id ??
       message.chat.id
     );
+
+  const user =
+    callback.from || {};
+
+  const userId =
+    String(user.id);
 
   const data =
     String(
       callback.data || ""
     );
 
-  // ========================================
-  // Difficulty
-  // ========================================
-
-  if (
-    data.startsWith(
-      "difficulty:"
-    )
-  ) {
-
-    const difficulty =
-      data.split(":")[1];
-
-    if (
-      !VALID_DIFFICULTIES.includes(
-        difficulty
-      )
-    ) {
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "درجه سختی نامعتبر است."
-      );
-
-      return;
-    }
-
-    const game =
-      newGame(difficulty);
-
-    await saveGame(
-      env,
-      chatId,
-      userId,
-      game
-    );
-
-    await sendGamePhoto(
-      token,
-      chatId,
-      game
-    );
-
-    await answerCallbackQuery(
-      token,
-      callbackId,
-      "🎮 بازی شروع شد."
-    );
-
-    return;
-  }
-
-  // ========================================
-  // Load Game
-  // ========================================
+  // ----------------------------------------
+  // پیدا کردن بازی
+  // ----------------------------------------
 
   let game =
-    await loadGame(
+    await getActiveGame(
       env,
       chatId
     );
@@ -509,11 +974,38 @@ async function handleCallbackQuery(
 
     await answerCallbackQuery(
       token,
-      callbackId,
-      "بازی فعالی پیدا نشد."
+      callback.id,
+      "❌ بازی فعال نیست."
     );
 
     return;
+  }
+
+  // ----------------------------------------
+  // اطمینان از عضویت بازیکن
+  // ----------------------------------------
+
+  let player =
+    await getPlayer(
+      env,
+      game.id,
+      userId
+    );
+
+  if (!player) {
+
+    await addPlayer(
+      env,
+      game.id,
+      user
+    );
+
+    player =
+      await getPlayer(
+        env,
+        game.id,
+        userId
+      );
   }
 
   // ========================================
@@ -537,43 +1029,20 @@ async function handleCallbackQuery(
 
       await answerCallbackQuery(
         token,
-        callbackId,
+        callback.id,
         "خانه نامعتبر است."
       );
 
       return;
     }
 
-    selectCell(
-      game,
-      index
-    );
+    player.selectedCell =
+      index;
 
-    await saveGame(
+    await savePlayer(
       env,
-      chatId,
-      userId,
-      game
+      player
     );
-
-    if (
-      game.puzzle[index] !== null
-    ) {
-
-      await editGamePhoto(
-        token,
-        message,
-        game
-      );
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "🔒 این خانه ثابت است."
-      );
-
-      return;
-    }
 
     await editGamePhoto(
       token,
@@ -583,7 +1052,8 @@ async function handleCallbackQuery(
 
     await answerCallbackQuery(
       token,
-      callbackId
+      callback.id,
+      `📍 خانه ${Math.floor(index / 9) + 1},${(index % 9) + 1}`
     );
 
     return;
@@ -597,13 +1067,12 @@ async function handleCallbackQuery(
     data === "mode:pencil"
   ) {
 
-    togglePencilMode(game);
+    player.pencilMode =
+      !player.pencilMode;
 
-    await saveGame(
+    await savePlayer(
       env,
-      chatId,
-      userId,
-      game
+      player
     );
 
     await editGamePhoto(
@@ -614,8 +1083,8 @@ async function handleCallbackQuery(
 
     await answerCallbackQuery(
       token,
-      callbackId,
-      game.pencilMode
+      callback.id,
+      player.pencilMode
         ? "✏️ مداد روشن شد."
         : "✏️ مداد خاموش شد."
     );
@@ -624,7 +1093,7 @@ async function handleCallbackQuery(
   }
 
   // ========================================
-  // Erase
+  // پاک کردن
   // ========================================
 
   if (
@@ -632,29 +1101,68 @@ async function handleCallbackQuery(
   ) {
 
     if (
-      game.selectedCell === -1
+      player.selectedCell === -1
     ) {
 
       await answerCallbackQuery(
         token,
-        callbackId,
+        callback.id,
         "اول یک خانه انتخاب کن."
       );
 
       return;
     }
 
+    const gameState = {
+
+      board:
+        [...game.board],
+
+      puzzle:
+        game.puzzle,
+
+      solution:
+        game.solution,
+
+      selectedCell:
+        player.selectedCell,
+
+      notes:
+        player.notes,
+
+      pencilMode:
+        player.pencilMode,
+
+      mistakes:
+        player.mistakes,
+
+      hints:
+        player.hints,
+
+      status:
+        game.status
+    };
+
     const result =
       eraseNumber(
-        game,
-        game.selectedCell
+        gameState,
+        player.selectedCell
       );
 
-    await saveGame(
+    game.board =
+      gameState.board;
+
+    player.notes =
+      gameState.notes;
+
+    await saveBoard(
       env,
-      chatId,
-      userId,
       game
+    );
+
+    await savePlayer(
+      env,
+      player
     );
 
     await editGamePhoto(
@@ -665,7 +1173,7 @@ async function handleCallbackQuery(
 
     await answerCallbackQuery(
       token,
-      callbackId,
+      callback.id,
       result.ok
         ? "🧹 پاک شد."
         : result.message
@@ -675,7 +1183,7 @@ async function handleCallbackQuery(
   }
 
   // ========================================
-  // Number
+  // عدد
   // ========================================
 
   if (
@@ -683,12 +1191,12 @@ async function handleCallbackQuery(
   ) {
 
     if (
-      game.selectedCell === -1
+      player.selectedCell === -1
     ) {
 
       await answerCallbackQuery(
         token,
-        callbackId,
+        callback.id,
         "اول یک خانه انتخاب کن."
       );
 
@@ -707,36 +1215,64 @@ async function handleCallbackQuery(
 
       await answerCallbackQuery(
         token,
-        callbackId,
+        callback.id,
         "عدد نامعتبر است."
       );
 
       return;
     }
 
-    const index =
-      game.selectedCell;
+    const gameState = {
 
-    // ======================================
+      board:
+        [...game.board],
+
+      puzzle:
+        game.puzzle,
+
+      solution:
+        game.solution,
+
+      selectedCell:
+        player.selectedCell,
+
+      notes:
+        player.notes,
+
+      pencilMode:
+        player.pencilMode,
+
+      mistakes:
+        player.mistakes,
+
+      hints:
+        player.hints,
+
+      status:
+        game.status
+    };
+
+    // --------------------------------------
     // Pencil
-    // ======================================
+    // --------------------------------------
 
     if (
-      game.pencilMode
+      player.pencilMode
     ) {
 
       const result =
         toggleNote(
-          game,
-          index,
+          gameState,
+          player.selectedCell,
           number
         );
 
-      await saveGame(
+      player.notes =
+        gameState.notes;
+
+      await savePlayer(
         env,
-        chatId,
-        userId,
-        game
+        player
       );
 
       await editGamePhoto(
@@ -747,7 +1283,7 @@ async function handleCallbackQuery(
 
       await answerCallbackQuery(
         token,
-        callbackId,
+        callback.id,
         result.ok
           ? (
               result.added
@@ -760,31 +1296,62 @@ async function handleCallbackQuery(
       return;
     }
 
-    // ======================================
+    // --------------------------------------
     // عدد اصلی
-    // ======================================
+    // --------------------------------------
 
     const result =
       putNumber(
-        game,
-        index,
+        gameState,
+        player.selectedCell,
         number
       );
 
-    await saveGame(
-      env,
-      chatId,
-      userId,
-      game
-    );
+    game.board =
+      gameState.board;
 
-    // ======================================
+    player.mistakes =
+      gameState.mistakes;
+
+    // --------------------------------------
+    // امتیاز
+    // --------------------------------------
+
+    if (
+      result.mistake
+    ) {
+
+      player.score =
+        Math.max(
+          0,
+          player.score - 1
+        );
+
+    } else {
+
+      player.score += 10;
+    }
+
+    // --------------------------------------
     // برد
-    // ======================================
+    // --------------------------------------
 
     if (
       result.won
     ) {
+
+      game.status =
+        "won";
+
+      await saveBoard(
+        env,
+        game
+      );
+
+      await savePlayer(
+        env,
+        player
+      );
 
       await editGamePhoto(
         token,
@@ -795,39 +1362,22 @@ async function handleCallbackQuery(
 
       await answerCallbackQuery(
         token,
-        callbackId,
-        "🎉 تبریک! Sudoku حل شد."
+        callback.id,
+        `🎉 ${getUserName(user)} برنده شد!`
       );
 
       return;
     }
 
-    // ======================================
-    // اشتباه
-    // ======================================
+    await saveBoard(
+      env,
+      game
+    );
 
-    if (
-      result.mistake
-    ) {
-
-      await editGamePhoto(
-        token,
-        message,
-        game
-      );
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        `❌ اشتباه! خطا: ${game.mistakes}`
-      );
-
-      return;
-    }
-
-    // ======================================
-    // صحیح
-    // ======================================
+    await savePlayer(
+      env,
+      player
+    );
 
     await editGamePhoto(
       token,
@@ -837,8 +1387,55 @@ async function handleCallbackQuery(
 
     await answerCallbackQuery(
       token,
-      callbackId,
-      "✅ درست!"
+      callback.id,
+      result.mistake
+        ? `❌ اشتباه! خطا: ${player.mistakes}`
+        : "✅ درست!"
+    );
+
+    return;
+  }
+
+  // ========================================
+  // بازی جدید
+  // ========================================
+
+  if (
+    data === "action:new"
+  ) {
+
+    const fresh =
+      newGame(
+        game.difficulty
+      );
+
+    game.puzzle =
+      fresh.puzzle;
+
+    game.solution =
+      fresh.solution;
+
+    game.board =
+      fresh.board;
+
+    game.status =
+      "playing";
+
+    await saveBoard(
+      env,
+      game
+    );
+
+    await editGamePhoto(
+      token,
+      message,
+      game
+    );
+
+    await answerCallbackQuery(
+      token,
+      callback.id,
+      "🔄 بازی جدید ساخته شد."
     );
 
     return;
@@ -852,16 +1449,55 @@ async function handleCallbackQuery(
     data === "action:hint"
   ) {
 
+    const gameState = {
+
+      board:
+        [...game.board],
+
+      puzzle:
+        game.puzzle,
+
+      solution:
+        game.solution,
+
+      selectedCell:
+        player.selectedCell,
+
+      notes:
+        player.notes,
+
+      pencilMode:
+        player.pencilMode,
+
+      mistakes:
+        player.mistakes,
+
+      hints:
+        player.hints,
+
+      status:
+        game.status
+    };
+
     const result =
       applyHint(
-        game
+        gameState
       );
 
-    await saveGame(
+    game.board =
+      gameState.board;
+
+    player.hints =
+      gameState.hints;
+
+    await saveBoard(
       env,
-      chatId,
-      userId,
       game
+    );
+
+    await savePlayer(
+      env,
+      player
     );
 
     await editGamePhoto(
@@ -873,7 +1509,7 @@ async function handleCallbackQuery(
 
     await answerCallbackQuery(
       token,
-      callbackId,
+      callback.id,
       result.message
     );
 
@@ -881,154 +1517,96 @@ async function handleCallbackQuery(
   }
 
   // ========================================
-  // New Game
+  // Difficulty
   // ========================================
 
   if (
-    data === "action:new"
+    data.startsWith("difficulty:")
   ) {
 
-    const freshGame =
-      newGame(
-        game.difficulty
+    const difficulty =
+      data.split(":")[1];
+
+    if (
+      !VALID_DIFFICULTIES.includes(
+        difficulty
+      )
+    ) {
+
+      await answerCallbackQuery(
+        token,
+        callback.id,
+        "درجه سختی نامعتبر است."
       );
 
-    await saveGame(
-      env,
-      chatId,
-      userId,
-      freshGame
-    );
+      return;
+    }
 
-    await editGamePhoto(
+    await createMultiplayerGame(
+      env,
       token,
-      message,
-      freshGame
+      chatId,
+      user,
+      difficulty
     );
 
     await answerCallbackQuery(
       token,
-      callbackId,
-      "🔄 بازی جدید ساخته شد."
+      callback.id,
+      "🎮 بازی آماده شد."
     );
 
     return;
   }
 
-  // ========================================
-  // پایان
-  // ========================================
-
   await answerCallbackQuery(
     token,
-    callbackId
+    callback.id
   );
 }
 
 // ==========================================
-// ویرایش عکس جدول
+// Caption
 // ==========================================
 
-async function editGamePhoto(
-  token,
-  message,
-  game,
-  finished = false
-) {
-
-  const png =
-    await renderSudokuPNG(game);
-
-  const caption =
-    createBoardCaption(game);
-
-  const keyboard =
-    finished
-      ? buildFinishedKeyboard()
-      : buildNumberKeyboard(game);
-
-  await editMessagePhoto(
-    token,
-    message.chat.id,
-    message.message_id,
-    png,
-    caption,
-    keyboard
-  );
-}
-
-// ==========================================
-// Caption جدول
-// ==========================================
-
-function createBoardCaption(
+function createCaption(
   game
 ) {
 
-  const lines = [
-
-    "🧩 <b>Sudoku</b>",
-
-    `🎯 سطح: ${
-      getDifficultyName(
-        game.difficulty
-      )
-    }`,
-
-    `📊 پیشرفت: ${
-      getProgress(game)
-    }%`,
-
-    `❌ اشتباه: ${
-      game.mistakes
-    }`,
-
-    `💡 راهنمایی: ${
-      game.hints
-    }`
-  ];
-
-  if (
-    game.status === "won"
-  ) {
-
-    lines.push(
-      "",
-      "🎉 <b>جدول حل شد!</b>"
-    );
-
-  } else if (
-    game.selectedCell !== -1
-  ) {
-
-    const row =
-      Math.floor(
-        game.selectedCell / 9
-      ) + 1;
-
-    const col =
-      (
-        game.selectedCell % 9
-      ) + 1;
-
-    lines.push(
-      "",
-      `📍 خانه انتخاب‌شده: ${row},${col}`
-    );
-
-  } else {
-
-    lines.push(
-      "",
-      "👆 یک خانه را انتخاب کن."
-    );
-  }
-
-  return lines.join("\n");
+  return [
+    "🧩 <b>Sudoku Multiplayer</b>",
+    "",
+    `🎯 سطح: ${getDifficultyName(game.difficulty)}`,
+    `📊 پیشرفت: ${getProgress(game)}%`,
+    "",
+    "👥 این بازی چندنفره است.",
+    "👆 خانه موردنظر را انتخاب کن."
+  ].join("\n");
 }
 
 // ==========================================
-// نام درجه سختی
+// نام کاربر
+// ==========================================
+
+function getUserName(
+  user
+) {
+
+  if (user.username) {
+
+    return `@${user.username}`;
+  }
+
+  if (user.first_name) {
+
+    return user.first_name;
+  }
+
+  return "بازیکن";
+}
+
+// ==========================================
+// Difficulty Name
 // ==========================================
 
 function getDifficultyName(
@@ -1052,176 +1630,4 @@ function getDifficultyName(
     names[difficulty] ||
     difficulty
   );
-}
-
-// ==========================================
-// ذخیره بازی
-// ==========================================
-
-async function saveGame(
-  env,
-  chatId,
-  userId,
-  game
-) {
-
-  if (!env.DB) {
-
-    throw new Error(
-      "D1 binding DB is missing."
-    );
-  }
-
-  const now =
-    Date.now();
-
-  await env.DB
-    .prepare(`
-      INSERT OR REPLACE INTO games (
-        chat_id,
-        user_id,
-        puzzle,
-        solution,
-        board,
-        notes,
-        selected_cell,
-        difficulty,
-        mistakes,
-        hints,
-        pencil_mode,
-        status,
-        created_at,
-        updated_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `)
-    .bind(
-
-      chatId,
-
-      userId,
-
-      JSON.stringify(
-        game.puzzle
-      ),
-
-      JSON.stringify(
-        game.solution
-      ),
-
-      JSON.stringify(
-        game.board
-      ),
-
-      JSON.stringify(
-        game.notes
-      ),
-
-      game.selectedCell,
-
-      game.difficulty,
-
-      game.mistakes,
-
-      game.hints,
-
-      game.pencilMode
-        ? 1
-        : 0,
-
-      game.status,
-
-      game.createdAt ||
-        now,
-
-      now
-
-    )
-    .run();
-}
-
-// ==========================================
-// دریافت بازی
-// ==========================================
-
-async function loadGame(
-  env,
-  chatId
-) {
-
-  if (!env.DB) {
-
-    throw new Error(
-      "D1 binding DB is missing."
-    );
-  }
-
-  const row =
-    await env.DB
-      .prepare(`
-        SELECT *
-        FROM games
-        WHERE chat_id = ?
-        LIMIT 1
-      `)
-      .bind(chatId)
-      .first();
-
-  if (!row) {
-    return null;
-  }
-
-  return {
-
-    puzzle:
-      JSON.parse(
-        row.puzzle
-      ),
-
-    solution:
-      JSON.parse(
-        row.solution
-      ),
-
-    board:
-      JSON.parse(
-        row.board
-      ),
-
-    notes:
-      JSON.parse(
-        row.notes
-      ),
-
-    selectedCell:
-      Number(
-        row.selected_cell
-      ),
-
-    difficulty:
-      row.difficulty,
-
-    mistakes:
-      Number(
-        row.mistakes
-      ),
-
-    hints:
-      Number(
-        row.hints
-      ),
-
-    pencilMode:
-      Boolean(
-        row.pencil_mode
-      ),
-
-    status:
-      row.status,
-
-    createdAt:
-      Number(
-        row.created_at
-      )
-  };
 }
