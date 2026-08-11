@@ -5,19 +5,24 @@
 // ==========================================
 
 import {
-  handleMessage,
-  handleCallbackQuery
+  handleUpdate
 } from "./handlers.js";
 
 export default {
 
-  async fetch(request, env) {
+  async fetch(
+    request,
+    env,
+    ctx
+  ) {
 
-    // ----------------------------------------
-    // GET
-    // ----------------------------------------
+    // --------------------------------------
+    // Health Check
+    // --------------------------------------
 
-    if (request.method === "GET") {
+    if (
+      request.method === "GET"
+    ) {
 
       return new Response(
         "🧩 Sudoku Bot is running.",
@@ -27,11 +32,14 @@ export default {
       );
     }
 
-    // ----------------------------------------
-    // فقط POST
-    // ----------------------------------------
 
-    if (request.method !== "POST") {
+    // --------------------------------------
+    // فقط POST
+    // --------------------------------------
+
+    if (
+      request.method !== "POST"
+    ) {
 
       return new Response(
         "Method Not Allowed",
@@ -41,59 +49,65 @@ export default {
       );
     }
 
-    try {
 
-      const update =
-        await request.json();
+    // --------------------------------------
+    // بررسی Token
+    // --------------------------------------
 
-      const token =
-        env.BOT_TOKEN;
+    if (
+      !env.BOT_TOKEN
+    ) {
 
-      if (!token) {
-
-        console.error(
-          "BOT_TOKEN is missing."
-        );
-
-        return new Response(
-          "BOT_TOKEN is missing.",
-          {
-            status: 500
-          }
-        );
-      }
-
-      // --------------------------------------
-      // Message
-      // --------------------------------------
-
-      if (update.message) {
-
-        await handleMessage(
-          update.message,
-          env,
-          token
-        );
-      }
-
-      // --------------------------------------
-      // Callback Query
-      // --------------------------------------
-
-      if (update.callback_query) {
-
-        await handleCallbackQuery(
-          update.callback_query,
-          env,
-          token
-        );
-      }
+      console.error(
+        "BOT_TOKEN is missing."
+      );
 
       return new Response(
-        "OK",
+        "BOT_TOKEN is missing.",
         {
-          status: 200
+          status: 500
         }
+      );
+    }
+
+
+    // --------------------------------------
+    // دریافت Update
+    // --------------------------------------
+
+    let update;
+
+    try {
+
+      update =
+        await request.json();
+
+    } catch (error) {
+
+      console.error(
+        "Invalid Telegram update:",
+        error
+      );
+
+      return new Response(
+        "Invalid JSON",
+        {
+          status: 400
+        }
+      );
+    }
+
+
+    // --------------------------------------
+    // پردازش Update
+    // --------------------------------------
+
+    try {
+
+      await handleUpdate(
+        update,
+        env,
+        env.BOT_TOKEN
       );
 
     } catch (error) {
@@ -103,12 +117,26 @@ export default {
         error
       );
 
+      /*
+       * عمداً در اینجا 200 برمی‌گردانیم
+       * تا Telegram دائماً همان Update
+       * را دوباره ارسال نکند.
+       */
+
       return new Response(
-        "Internal Server Error",
+        "OK",
         {
-          status: 500
+          status: 200
         }
       );
     }
+
+
+    return new Response(
+      "OK",
+      {
+        status: 200
+      }
+    );
   }
 };
