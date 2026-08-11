@@ -1,59 +1,93 @@
 // ==========================================
 // src/telegram.js
-// Telegram Bot API
+// Telegram API
 // Cloudflare Workers
 // ==========================================
 
+
 // ==========================================
-// درخواست عمومی به Telegram
+// Telegram API Request
 // ==========================================
 
 async function telegramRequest(
   token,
   method,
-  body = {}
+  body
 ) {
+
+  if (!token) {
+
+    throw new Error(
+      "Telegram BOT_TOKEN is missing."
+    );
+  }
+
+
   const url =
     `https://api.telegram.org/bot${token}/${method}`;
 
+
   const response =
-    await fetch(url, {
-      method: "POST",
+    await fetch(
+      url,
+      {
+        method: "POST",
 
-      headers: {
-        "Content-Type":
-          "application/json"
-      },
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
 
-      body:
-        JSON.stringify(body)
-    });
+        body:
+          JSON.stringify(body)
+      }
+    );
+
 
   let data;
 
+
   try {
+
     data =
       await response.json();
+
   } catch {
+
     throw new Error(
       `Telegram returned invalid JSON. HTTP ${response.status}`
     );
   }
 
-  if (!response.ok || !data.ok) {
+
+  if (
+    !response.ok ||
+    !data.ok
+  ) {
+
+    const description =
+      data?.description ||
+      `HTTP ${response.status}`;
+
+
+    console.error(
+      `Telegram API error [${method}]:`,
+      description
+    );
+
+
     throw new Error(
-      `Telegram API error in ${method}: ${
-        data?.description ||
-        `HTTP ${response.status}`
-      }`
+      `Telegram API error: ${description}`
     );
   }
+
 
   return data.result;
 }
 
+
 // ==========================================
-// ارسال پیام
+// Send Message
 // ==========================================
 
 export async function sendMessage(
@@ -62,23 +96,32 @@ export async function sendMessage(
   text,
   replyMarkup = null
 ) {
+
   const body = {
+
     chat_id:
       chatId,
 
-    text,
+    text:
+      String(text ?? ""),
 
     parse_mode:
       "HTML",
 
     disable_web_page_preview:
       true
+
   };
 
-  if (replyMarkup) {
+
+  if (
+    replyMarkup
+  ) {
+
     body.reply_markup =
       replyMarkup;
   }
+
 
   return telegramRequest(
     token,
@@ -87,8 +130,9 @@ export async function sendMessage(
   );
 }
 
+
 // ==========================================
-// ویرایش متن پیام
+// Edit Message Text
 // ==========================================
 
 export async function editMessageText(
@@ -98,26 +142,43 @@ export async function editMessageText(
   text,
   replyMarkup = null
 ) {
+
   const body = {
+
     chat_id:
       chatId,
 
     message_id:
-      messageId,
+      Number(messageId),
 
-    text,
+    text:
+      String(text ?? ""),
 
     parse_mode:
       "HTML",
 
     disable_web_page_preview:
       true
+
   };
 
-  if (replyMarkup) {
+
+  if (
+    replyMarkup
+  ) {
+
     body.reply_markup =
       replyMarkup;
+
+  } else {
+
+    body.reply_markup = {
+
+      inline_keyboard: []
+
+    };
   }
+
 
   return telegramRequest(
     token,
@@ -126,220 +187,37 @@ export async function editMessageText(
   );
 }
 
-// ==========================================
-// ارسال عکس PNG
-// ==========================================
-
-export async function sendPhoto(
-  token,
-  chatId,
-  pngBytes,
-  caption = "",
-  replyMarkup = null
-) {
-  const url =
-    `https://api.telegram.org/bot${token}/sendPhoto`;
-
-  const form =
-    new FormData();
-
-  form.append(
-    "chat_id",
-    String(chatId)
-  );
-
-  if (caption) {
-    form.append(
-      "caption",
-      caption
-    );
-
-    form.append(
-      "parse_mode",
-      "HTML"
-    );
-  }
-
-  if (replyMarkup) {
-    form.append(
-      "reply_markup",
-      JSON.stringify(
-        replyMarkup
-      )
-    );
-  }
-
-  // تبدیل Uint8Array به Blob
-  const blob =
-    new Blob(
-      [pngBytes],
-      {
-        type:
-          "image/png"
-      }
-    );
-
-  form.append(
-    "photo",
-    blob,
-    "sudoku.png"
-  );
-
-  const response =
-    await fetch(
-      url,
-      {
-        method: "POST",
-        body: form
-      }
-    );
-
-  let data;
-
-  try {
-    data =
-      await response.json();
-  } catch {
-    throw new Error(
-      `Telegram returned invalid JSON while sending photo. HTTP ${response.status}`
-    );
-  }
-
-  if (!response.ok || !data.ok) {
-    throw new Error(
-      `Telegram API error in sendPhoto: ${
-        data?.description ||
-        `HTTP ${response.status}`
-      }`
-    );
-  }
-
-  return data.result;
-}
 
 // ==========================================
-// ویرایش عکس پیام
-// ==========================================
-
-export async function editMessagePhoto(
-  token,
-  chatId,
-  messageId,
-  pngBytes,
-  caption = "",
-  replyMarkup = null
-) {
-  const url =
-    `https://api.telegram.org/bot${token}/editMessageMedia`;
-
-  const form =
-    new FormData();
-
-  form.append(
-    "chat_id",
-    String(chatId)
-  );
-
-  form.append(
-    "message_id",
-    String(messageId)
-  );
-
-  const blob =
-    new Blob(
-      [pngBytes],
-      {
-        type:
-          "image/png"
-      }
-    );
-
-  form.append(
-    "media",
-    JSON.stringify({
-      type:
-        "photo",
-
-      media:
-        "attach://sudoku",
-
-      caption:
-        caption,
-
-      parse_mode:
-        "HTML"
-    })
-  );
-
-  form.append(
-    "photo",
-    blob,
-    "sudoku.png"
-  );
-
-  if (replyMarkup) {
-    form.append(
-      "reply_markup",
-      JSON.stringify(
-        replyMarkup
-      )
-    );
-  }
-
-  const response =
-    await fetch(
-      url,
-      {
-        method: "POST",
-        body: form
-      }
-    );
-
-  let data;
-
-  try {
-    data =
-      await response.json();
-  } catch {
-    throw new Error(
-      `Telegram returned invalid JSON while editing photo. HTTP ${response.status}`
-    );
-  }
-
-  if (!response.ok || !data.ok) {
-    throw new Error(
-      `Telegram API error in editMessageMedia: ${
-        data?.description ||
-        `HTTP ${response.status}`
-      }`
-    );
-  }
-
-  return data.result;
-}
-
-// ==========================================
-// پاسخ Callback Query
+// Answer Callback Query
 // ==========================================
 
 export async function answerCallbackQuery(
   token,
   callbackQueryId,
-  text = null,
+  text = "",
   showAlert = false
 ) {
+
   const body = {
+
     callback_query_id:
       callbackQueryId,
 
     show_alert:
-      showAlert
+      Boolean(showAlert)
+
   };
 
-  if (text) {
+
+  if (
+    text
+  ) {
+
     body.text =
-      text;
+      String(text);
   }
+
 
   return telegramRequest(
     token,
@@ -348,8 +226,9 @@ export async function answerCallbackQuery(
   );
 }
 
+
 // ==========================================
-// حذف پیام
+// Delete Message
 // ==========================================
 
 export async function deleteMessage(
@@ -357,60 +236,134 @@ export async function deleteMessage(
   chatId,
   messageId
 ) {
+
   return telegramRequest(
     token,
     "deleteMessage",
     {
+
       chat_id:
         chatId,
 
       message_id:
-        messageId
+        Number(messageId)
+
     }
   );
 }
 
+
 // ==========================================
-// Webhook
+// Edit Reply Markup
+// ==========================================
+
+export async function editMessageReplyMarkup(
+  token,
+  chatId,
+  messageId,
+  replyMarkup
+) {
+
+  return telegramRequest(
+    token,
+    "editMessageReplyMarkup",
+    {
+
+      chat_id:
+        chatId,
+
+      message_id:
+        Number(messageId),
+
+      reply_markup:
+        replyMarkup || {
+          inline_keyboard: []
+        }
+
+    }
+  );
+}
+
+
+// ==========================================
+// Set Webhook
 // ==========================================
 
 export async function setWebhook(
   token,
   webhookUrl
 ) {
+
   return telegramRequest(
     token,
     "setWebhook",
     {
-      url:
-        webhookUrl,
 
-      allowed_updates: [
-        "message",
-        "callback_query"
-      ]
+      url:
+        webhookUrl
+
     }
   );
 }
+
+
+// ==========================================
+// Delete Webhook
+// ==========================================
 
 export async function deleteWebhook(
   token
 ) {
+
   return telegramRequest(
     token,
     "deleteWebhook",
     {
+
       drop_pending_updates:
         true
+
     }
   );
 }
 
+
+// ==========================================
+// Get Webhook Info
+// ==========================================
+
 export async function getWebhookInfo(
   token
 ) {
+
   return telegramRequest(
     token,
-    "getWebhookInfo"
+    "getWebhookInfo",
+    {}
   );
 }
+
+
+// ==========================================
+// Get Me
+// ==========================================
+
+export async function getMe(
+  token
+) {
+
+  return telegramRequest(
+    token,
+    "getMe",
+    {}
+  );
+}
+
+
+// ==========================================
+// Export low-level API
+// ==========================================
+
+export {
+  telegramRequest
+};
