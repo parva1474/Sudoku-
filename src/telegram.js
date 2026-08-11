@@ -87,6 +87,146 @@ async function telegramRequest(
 
 
 // ==========================================
+// Send Photo
+// ==========================================
+
+export async function sendPhoto(
+  token,
+  chatId,
+  photo,
+  caption = "",
+  replyMarkup = null
+) {
+
+  const formData =
+    new FormData();
+
+  formData.append(
+    "chat_id",
+    String(chatId)
+  );
+
+  if (caption) {
+
+    formData.append(
+      "caption",
+      String(caption)
+    );
+
+  }
+
+  formData.append(
+    "parse_mode",
+    "HTML"
+  );
+
+
+  if (replyMarkup) {
+
+    formData.append(
+      "reply_markup",
+      JSON.stringify(replyMarkup)
+    );
+
+  }
+
+
+  // ----------------------------------------
+  // اگر photo یک Blob / File باشد
+  // ----------------------------------------
+
+  if (
+    photo instanceof Blob
+  ) {
+
+    formData.append(
+      "photo",
+      photo,
+      "sudoku.png"
+    );
+
+  }
+
+  // ----------------------------------------
+  // اگر photo رشته باشد
+  // ----------------------------------------
+
+  else if (
+    typeof photo === "string"
+  ) {
+
+    formData.append(
+      "photo",
+      photo
+    );
+
+  }
+
+  else {
+
+    throw new Error(
+      "Invalid photo data."
+    );
+
+  }
+
+
+  const url =
+    `https://api.telegram.org/bot${token}/sendPhoto`;
+
+
+  const response =
+    await fetch(
+      url,
+      {
+        method: "POST",
+        body: formData
+      }
+    );
+
+
+  let data;
+
+  try {
+
+    data =
+      await response.json();
+
+  } catch {
+
+    throw new Error(
+      `Telegram returned invalid JSON. HTTP ${response.status}`
+    );
+
+  }
+
+
+  if (
+    !response.ok ||
+    !data.ok
+  ) {
+
+    const description =
+      data?.description ||
+      `HTTP ${response.status}`;
+
+
+    console.error(
+      "Telegram sendPhoto error:",
+      description
+    );
+
+
+    throw new Error(
+      `Telegram API error: ${description}`
+    );
+
+  }
+
+
+  return data.result;
+}
+// ==========================================
 // Send Message
 // ==========================================
 
