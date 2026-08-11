@@ -1,6 +1,7 @@
 // ==========================================
 // src/sudoku.js
-// Sudoku Generator + Solver
+// Sudoku Generator + Solver + Hint
+// Cloudflare Workers compatible
 // ==========================================
 
 
@@ -8,198 +9,122 @@
 // تنظیمات سختی
 // ==========================================
 
-const DIFFICULTY_CLUES = {
+const DIFFICULTY_CONFIG = {
 
-  easy:
-    42,
+  easy: {
+    clues: 45
+  },
 
-  medium:
-    36,
+  medium: {
+    clues: 38
+  },
 
-  hard:
-    31,
+  hard: {
+    clues: 32
+  },
 
-  expert:
-    27,
+  expert: {
+    clues: 27
+  },
 
-  master:
-    23
+  master: {
+    clues: 23
+  }
+
 };
 
 
 // ==========================================
-// تولید Sudoku
+// ابزار تصادفی
 // ==========================================
 
-export function generateSudoku(
-  difficulty = "medium"
+function randomInt(
+  min,
+  max
 ) {
 
-  const clues =
-    DIFFICULTY_CLUES[difficulty] ||
-    DIFFICULTY_CLUES.medium;
-
-
-  const solution =
-    createSolvedBoard();
-
-
-  const puzzle =
-    [...solution];
-
-
-  removeCells(
-    puzzle,
-    81 - clues
-  );
-
-
-  return {
-
-    puzzle,
-
-    solution
-  };
+  return Math.floor(
+    Math.random() *
+    (max - min + 1)
+  ) + min;
 }
 
 
 // ==========================================
-// ساخت جدول حل‌شده
+// Shuffle
 // ==========================================
 
-function createSolvedBoard() {
-
-  const board =
-    Array(81).fill(null);
-
-
-  if (
-    solveBoard(board)
-  ) {
-
-    return board;
-  }
-
-
-  throw new Error(
-    "Unable to generate Sudoku solution."
-  );
-}
-
-
-// ==========================================
-// Solver
-// ==========================================
-
-function solveBoard(
-  board
+function shuffle(
+  array
 ) {
 
-  const index =
-    findEmptyCell(board);
-
-
-  if (
-    index === -1
-  ) {
-
-    return true;
-  }
-
-
-  const numbers =
-    shuffle([
-      1,2,3,4,5,6,7,8,9
-    ]);
+  const result =
+    [...array];
 
 
   for (
-    const number of numbers
+    let i = result.length - 1;
+    i > 0;
+    i--
   ) {
 
-    if (
-      isValidMove(
-        board,
-        index,
-        number
-      )
-    ) {
-
-      board[index] =
-        number;
+    const j =
+      randomInt(
+        0,
+        i
+      );
 
 
-      if (
-        solveBoard(board)
-      ) {
-
-        return true;
-      }
-
-
-      board[index] =
-        null;
-    }
+    [
+      result[i],
+      result[j]
+    ] = [
+      result[j],
+      result[i]
+    ];
   }
 
 
-  return false;
+  return result;
 }
 
 
 // ==========================================
-// اولین خانه خالی
+// بررسی امکان قرار دادن عدد
 // ==========================================
 
-function findEmptyCell(
-  board
-) {
-
-  for (
-    let i = 0;
-    i < 81;
-    i++
-  ) {
-
-    if (
-      board[i] === null ||
-      board[i] === undefined
-    ) {
-
-      return i;
-    }
-  }
-
-  return -1;
-}
-
-
-// ==========================================
-// بررسی حرکت
-// ==========================================
-
-function isValidMove(
+function isSafe(
   board,
   index,
   number
 ) {
 
   const row =
-    Math.floor(index / 9);
+    Math.floor(
+      index / 9
+    );
 
   const col =
     index % 9;
 
 
+  // ----------------------------------------
   // سطر
+  // ----------------------------------------
+
   for (
     let c = 0;
     c < 9;
     c++
   ) {
 
+    const i =
+      row * 9 + c;
+
+
     if (
-      board[row * 9 + c] === number
+      i !== index &&
+      board[i] === number
     ) {
 
       return false;
@@ -207,15 +132,23 @@ function isValidMove(
   }
 
 
+  // ----------------------------------------
   // ستون
+  // ----------------------------------------
+
   for (
     let r = 0;
     r < 9;
     r++
   ) {
 
+    const i =
+      r * 9 + col;
+
+
     if (
-      board[r * 9 + col] === number
+      i !== index &&
+      board[i] === number
     ) {
 
       return false;
@@ -223,7 +156,10 @@ function isValidMove(
   }
 
 
-  // بلوک 3×3
+  // ----------------------------------------
+  // بلوک ۳×۳
+  // ----------------------------------------
+
   const startRow =
     Math.floor(row / 3) * 3;
 
@@ -243,8 +179,13 @@ function isValidMove(
       c++
     ) {
 
+      const i =
+        r * 9 + c;
+
+
       if (
-        board[r * 9 + c] === number
+        i !== index &&
+        board[i] === number
       ) {
 
         return false;
@@ -258,13 +199,471 @@ function isValidMove(
 
 
 // ==========================================
-// حذف خانه‌ها
+// ساخت جدول کامل
 // ==========================================
 
-function removeCells(
-  puzzle,
-  amount
+function fillBoard(
+  board
 ) {
+
+  // ----------------------------------------
+  // پیدا کردن خانه خالی
+  // ----------------------------------------
+
+  let emptyIndex =
+    -1;
+
+
+  for (
+    let i = 0;
+    i < 81;
+    i++
+  ) {
+
+    if (
+      board[i] === null
+    ) {
+
+      emptyIndex =
+        i;
+
+      break;
+    }
+  }
+
+
+  // جدول کامل شده
+
+  if (
+    emptyIndex === -1
+  ) {
+
+    return true;
+  }
+
+
+  const numbers =
+    shuffle([
+      1, 2, 3,
+      4, 5, 6,
+      7, 8, 9
+    ]);
+
+
+  for (
+    const number of numbers
+  ) {
+
+    if (
+      !isSafe(
+        board,
+        emptyIndex,
+        number
+      )
+    ) {
+
+      continue;
+    }
+
+
+    board[emptyIndex] =
+      number;
+
+
+    if (
+      fillBoard(board)
+    ) {
+
+      return true;
+    }
+
+
+    board[emptyIndex] =
+      null;
+  }
+
+
+  return false;
+}
+
+
+// ==========================================
+// حل Sudoku
+// ==========================================
+
+function solveBoard(
+  board
+) {
+
+  let bestIndex =
+    -1;
+
+  let bestCandidates =
+    null;
+
+
+  // ----------------------------------------
+  // MRV
+  // پیدا کردن خانه با کمترین کاندیدا
+  // ----------------------------------------
+
+  for (
+    let i = 0;
+    i < 81;
+    i++
+  ) {
+
+    if (
+      board[i] !== null
+    ) {
+
+      continue;
+    }
+
+
+    const candidates =
+      getCandidates(
+        board,
+        i
+      );
+
+
+    if (
+      candidates.length === 0
+    ) {
+
+      return false;
+    }
+
+
+    if (
+      bestCandidates === null ||
+      candidates.length <
+        bestCandidates.length
+    ) {
+
+      bestIndex =
+        i;
+
+      bestCandidates =
+        candidates;
+
+
+      if (
+        candidates.length === 1
+      ) {
+
+        break;
+      }
+    }
+  }
+
+
+  // حل شد
+
+  if (
+    bestIndex === -1
+  ) {
+
+    return true;
+  }
+
+
+  for (
+    const number of bestCandidates
+  ) {
+
+    board[bestIndex] =
+      number;
+
+
+    if (
+      solveBoard(board)
+    ) {
+
+      return true;
+    }
+
+
+    board[bestIndex] =
+      null;
+  }
+
+
+  return false;
+}
+
+
+// ==========================================
+// کاندیداهای یک خانه
+// ==========================================
+
+function getCandidates(
+  board,
+  index
+) {
+
+  const used =
+    new Set();
+
+
+  const row =
+    Math.floor(
+      index / 9
+    );
+
+  const col =
+    index % 9;
+
+
+  // سطر
+
+  for (
+    let c = 0;
+    c < 9;
+    c++
+  ) {
+
+    const value =
+      board[
+        row * 9 + c
+      ];
+
+
+    if (
+      value !== null &&
+      value !== undefined
+    ) {
+
+      used.add(value);
+    }
+  }
+
+
+  // ستون
+
+  for (
+    let r = 0;
+    r < 9;
+    r++
+  ) {
+
+    const value =
+      board[
+        r * 9 + col
+      ];
+
+
+    if (
+      value !== null &&
+      value !== undefined
+    ) {
+
+      used.add(value);
+    }
+  }
+
+
+  // بلوک
+
+  const startRow =
+    Math.floor(row / 3) * 3;
+
+  const startCol =
+    Math.floor(col / 3) * 3;
+
+
+  for (
+    let r = startRow;
+    r < startRow + 3;
+    r++
+  ) {
+
+    for (
+      let c = startCol;
+      c < startCol + 3;
+      c++
+    ) {
+
+      const value =
+        board[
+          r * 9 + c
+        ];
+
+
+      if (
+        value !== null &&
+        value !== undefined
+      ) {
+
+        used.add(value);
+      }
+    }
+  }
+
+
+  const candidates =
+    [];
+
+
+  for (
+    let number = 1;
+    number <= 9;
+    number++
+  ) {
+
+    if (
+      !used.has(number)
+    ) {
+
+      candidates.push(
+        number
+      );
+    }
+  }
+
+
+  return candidates;
+}
+
+
+// ==========================================
+// تعداد راه‌حل‌ها
+// برای اطمینان از Unique بودن
+// ==========================================
+
+function countSolutions(
+  board,
+  limit = 2
+) {
+
+  let count =
+    0;
+
+
+  function search() {
+
+    if (
+      count >= limit
+    ) {
+
+      return;
+    }
+
+
+    let bestIndex =
+      -1;
+
+    let bestCandidates =
+      null;
+
+
+    for (
+      let i = 0;
+      i < 81;
+      i++
+    ) {
+
+      if (
+        board[i] !== null
+      ) {
+
+        continue;
+      }
+
+
+      const candidates =
+        getCandidates(
+          board,
+          i
+        );
+
+
+      if (
+        candidates.length === 0
+      ) {
+
+        return;
+      }
+
+
+      if (
+        bestCandidates === null ||
+        candidates.length <
+          bestCandidates.length
+      ) {
+
+        bestIndex =
+          i;
+
+        bestCandidates =
+          candidates;
+
+
+        if (
+          candidates.length === 1
+        ) {
+
+          break;
+        }
+      }
+    }
+
+
+    // یک راه‌حل پیدا شد
+
+    if (
+      bestIndex === -1
+    ) {
+
+      count++;
+      return;
+    }
+
+
+    for (
+      const number of bestCandidates
+    ) {
+
+      board[bestIndex] =
+        number;
+
+
+      search();
+
+
+      board[bestIndex] =
+        null;
+
+
+      if (
+        count >= limit
+      ) {
+
+        return;
+      }
+    }
+  }
+
+
+  search();
+
+  return count;
+}
+
+
+// ==========================================
+// ساخت Puzzle
+// ==========================================
+
+function makePuzzle(
+  solution,
+  clues
+) {
+
+  const puzzle =
+    [...solution];
+
 
   const indexes =
     shuffle(
@@ -275,7 +674,12 @@ function removeCells(
     );
 
 
-  let removed = 0;
+  let removed =
+    0;
+
+
+  const targetRemove =
+    81 - clues;
 
 
   for (
@@ -283,8 +687,9 @@ function removeCells(
   ) {
 
     if (
-      removed >= amount
+      removed >= targetRemove
     ) {
+
       break;
     }
 
@@ -297,14 +702,23 @@ function removeCells(
       null;
 
 
-    // اگر می‌خواهیم بازی قابل حل باقی بماند
-    // حداقل یک جواب داشته باشد.
+    // --------------------------------------
+    // بررسی Unique بودن
+    // --------------------------------------
+
     const test =
       [...puzzle];
 
 
+    const solutions =
+      countSolutions(
+        test,
+        2
+      );
+
+
     if (
-      hasSolution(test)
+      solutions === 1
     ) {
 
       removed++;
@@ -315,62 +729,76 @@ function removeCells(
         backup;
     }
   }
+
+
+  return puzzle;
 }
 
 
 // ==========================================
-// آیا جدول قابل حل است؟
+// Generate Sudoku
 // ==========================================
 
-function hasSolution(
-  board
+export function generateSudoku(
+  difficulty = "medium"
 ) {
 
-  const index =
-    findEmptyCell(board);
+  const config =
+    DIFFICULTY_CONFIG[
+      difficulty
+    ] ||
+    DIFFICULTY_CONFIG.medium;
 
 
-  if (
-    index === -1
-  ) {
+  // ----------------------------------------
+  // جدول کامل
+  // ----------------------------------------
 
-    return true;
+  const solution =
+    Array(
+      81
+    ).fill(null);
+
+
+  const success =
+    fillBoard(
+      solution
+    );
+
+
+  if (!success) {
+
+    throw new Error(
+      "Unable to generate Sudoku solution."
+    );
   }
 
 
-  for (
-    let number = 1;
-    number <= 9;
-    number++
-  ) {
+  // ----------------------------------------
+  // Puzzle
+  // ----------------------------------------
 
-    if (
-      isValidMove(
-        board,
-        index,
-        number
-      )
-    ) {
-
-      board[index] =
-        number;
+  const puzzle =
+    makePuzzle(
+      solution,
+      config.clues
+    );
 
 
-      if (
-        hasSolution(board)
-      ) {
+  return {
 
-        return true;
-      }
+    puzzle,
 
+    solution,
 
-      board[index] =
-        null;
-    }
-  }
+    difficulty,
 
-
-  return false;
+    clues:
+      puzzle.filter(
+        value =>
+          value !== null
+      ).length
+  };
 }
 
 
@@ -385,14 +813,19 @@ export function getHint(
 
   if (
     !Array.isArray(board) ||
-    !Array.isArray(solution)
+    !Array.isArray(solution) ||
+    board.length !== 81 ||
+    solution.length !== 81
   ) {
 
     return null;
   }
 
 
-  // اول خانه خالی پیدا کن
+  // ----------------------------------------
+  // ابتدا خانه انتخاب‌شده را بررسی کن
+  // ----------------------------------------
+
   for (
     let i = 0;
     i < 81;
@@ -421,38 +854,116 @@ export function getHint(
 
 
 // ==========================================
-// Shuffle
+// بررسی اعتبار جدول
 // ==========================================
 
-function shuffle(
-  array
+export function isValidBoard(
+  board
 ) {
 
-  const result =
-    [...array];
-
-
-  for (
-    let i = result.length - 1;
-    i > 0;
-    i--
+  if (
+    !Array.isArray(board) ||
+    board.length !== 81
   ) {
 
-    const j =
-      Math.floor(
-        Math.random() * (i + 1)
-      );
-
-
-    [
-      result[i],
-      result[j]
-    ] = [
-      result[j],
-      result[i]
-    ];
+    return false;
   }
 
 
-  return result;
+  for (
+    let i = 0;
+    i < 81;
+    i++
+  ) {
+
+    const value =
+      board[i];
+
+
+    if (
+      value === null ||
+      value === undefined
+    ) {
+
+      continue;
+    }
+
+
+    if (
+      !isValidNumber(value)
+    ) {
+
+      return false;
+    }
+
+
+    if (
+      !isSafe(
+        board,
+        i,
+        value
+      )
+    ) {
+
+      return false;
+    }
+  }
+
+
+  return true;
+}
+
+
+// ==========================================
+// بررسی عدد
+// ==========================================
+
+function isValidNumber(
+  number
+) {
+
+  return (
+    Number.isInteger(number) &&
+    number >= 1 &&
+    number <= 9
+  );
+}
+
+
+// ==========================================
+// تعداد خانه‌های پر
+// ==========================================
+
+export function countFilled(
+  board
+) {
+
+  if (
+    !Array.isArray(board)
+  ) {
+
+    return 0;
+  }
+
+
+  return board.filter(
+    value =>
+      value !== null &&
+      value !== undefined
+  ).length;
+}
+
+
+// ==========================================
+// تعداد خانه‌های خالی
+// ==========================================
+
+export function countEmpty(
+  board
+) {
+
+  return (
+    81 -
+    countFilled(board)
+  );
 }
