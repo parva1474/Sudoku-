@@ -412,7 +412,7 @@ async function startNewGame(
 
 
 // ==========================================
-// ارسال بازی به صورت تصویر
+// ارسال بازی به صورت تصویر (با فرمت Blob)
 // ==========================================
 
 async function sendGameMessage(
@@ -426,6 +426,7 @@ async function sendGameMessage(
       game
     );
 
+  const pngBlob = new Blob([png], { type: 'image/png' });
 
   const caption =
     createBoardCaption(
@@ -436,7 +437,7 @@ async function sendGameMessage(
   await sendPhoto(
     token,
     chatId,
-    png,
+    pngBlob,
     caption,
     buildBlockKeyboard(game)
   );
@@ -444,7 +445,7 @@ async function sendGameMessage(
 
 
 // ==========================================
-// ویرایش تصویر بازی
+// ویرایش تصویر بازی (با فرمت Blob)
 // ==========================================
 
 async function editGameMessage(
@@ -458,6 +459,7 @@ async function editGameMessage(
       game
     );
 
+  const pngBlob = new Blob([png], { type: 'image/png' });
 
   const caption =
     createBoardCaption(
@@ -477,7 +479,7 @@ async function editGameMessage(
       token,
       message.chat.id,
       message.message_id,
-      png,
+      pngBlob,
       caption,
       buildFinishedKeyboard()
     );
@@ -490,7 +492,7 @@ async function editGameMessage(
     token,
     message.chat.id,
     message.message_id,
-    png,
+    pngBlob,
     caption,
     buildBlockKeyboard(game)
   );
@@ -615,15 +617,6 @@ async function handleCallbackQuery(
     );
 
 
-    /*
-     * پیام قبلی در این مرحله متنی است
-     * (پیام انتخاب درجه سختی).
-     * بنابراین نمی‌توانیم editMessagePhoto کنیم.
-     *
-     * اول پیام قبلی را به یک پیام متنی
-     * بازی تبدیل می‌کنیم و سپس عکس را ارسال می‌کنیم.
-     */
-
     await sendGameMessage(
       token,
       chatId,
@@ -725,22 +718,19 @@ async function handleCallbackQuery(
     data === "action:blocks"
   ) {
 
-    /*
-     * اگر پیام فعلی عکس است، باید عکس را
-     * با همان عکس و کیبورد جدید ویرایش کنیم.
-     */
-
     const png =
       await renderSudokuPNG(
         game
       );
+
+    const pngBlob = new Blob([png], { type: 'image/png' });
 
 
     await editMessagePhoto(
       token,
       message.chat.id,
       message.message_id,
-      png,
+      pngBlob,
       createBoardCaption(game),
       buildBlockKeyboard(game)
     );
@@ -866,23 +856,19 @@ async function handleCallbackQuery(
     );
 
 
-    /*
-     * بعد از انتخاب خانه، تصویر را دوباره
-     * تولید می‌کنیم تا خانه انتخاب‌شده
-     * هایلایت شود.
-     */
-
     const png =
       await renderSudokuPNG(
         game
       );
+
+    const pngBlob = new Blob([png], { type: 'image/png' });
 
 
     await editMessagePhoto(
       token,
       message.chat.id,
       message.message_id,
-      png,
+      pngBlob,
       createNumberScreenText(game),
       buildNumberKeyboard(game)
     );
@@ -1344,12 +1330,6 @@ async function handleCallbackQuery(
     );
 
 
-    /*
-     * پیام فعلی عکس است.
-     * بنابراین مستقیماً همان پیام
-     * با عکس جدید جایگزین می‌شود.
-     */
-
     await editGameMessage(
       token,
       message,
@@ -1393,12 +1373,14 @@ async function editNumberScreen(
       game
     );
 
+  const pngBlob = new Blob([png], { type: 'image/png' });
+
 
   await editMessagePhoto(
     token,
     message.chat.id,
     message.message_id,
-    png,
+    pngBlob,
     createNumberScreenText(game),
     buildNumberKeyboard(game)
   );
@@ -1789,4 +1771,4 @@ function safeJSON(
 
     return fallback;
   }
-    }
+}
