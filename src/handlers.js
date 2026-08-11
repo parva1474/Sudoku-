@@ -689,6 +689,33 @@ async function handleCallbackQuery(
     }
 
 
+    // چون پیام حاوی عکس است، باید از ویرایش کپشن (یا ویرایش عکس همراه با کپشن جدید) استفاده کنیم
+    const png = await renderSudokuPNG(game);
+    const pngBlob = new Blob([png], { type: 'image/png' });
+
+    await editMessagePhoto(
+      token,
+      message.chat.id,
+      message.message_id,
+      pngBlob,
+      createBoardCaption(game),
+      buildCellKeyboard(
+        block,
+        game
+      )
+    );
+
+
+    await answerCallbackQuery(
+      token,
+      callbackId
+    );
+
+    return;
+  }
+
+
+
     await editMessageText(
       token,
       message.chat.id,
