@@ -322,7 +322,7 @@ export function buildSudokuSvg(
 // SVG → PNG
 // ==========================================
 
-export async function renderSudokuPng(
+export async function renderSudokuPNG(
   game
 ) {
 
