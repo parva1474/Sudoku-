@@ -37,7 +37,7 @@ import {
 } from "./sudoku.js";
 
 import {
-  renderSudokuPNG
+  rendersudokuPng
 } from "./sudoku-image.js";
 
 
