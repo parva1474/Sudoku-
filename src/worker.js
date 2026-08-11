@@ -1,4 +1,373 @@
 // ==========================================
+// src/sudoku-image.js
+// Sudoku Board Renderer
+// Cloudflare Workers + resvg
+// ==========================================
+
+import {
+  Resvg
+} from "@cf-wasm/resvg/workerd";
+
+const IMAGE_SIZE = 540;
+const PADDING = 12;
+
+const BOARD_SIZE =
+  IMAGE_SIZE -
+  (PADDING * 2);
+
+const CELL_SIZE =
+  BOARD_SIZE / 9;
+
+
+// ==========================================
+// اعداد فارسی
+// ==========================================
+
+function toPersianDigit(value) {
+
+  const digits = [
+    "۰",
+    "۱",
+    "۲",
+    "۳",
+    "۴",
+    "۵",
+    "۶",
+    "۷",
+    "۸",
+    "۹"
+  ];
+
+  return String(value).replace(
+    /[0-9]/g,
+    digit =>
+      digits[Number(digit)]
+  );
+}
+
+
+// ==========================================
+// Escape XML
+// ==========================================
+
+function escapeXML(value) {
+
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+
+// ==========================================
+// ساخت SVG
+// ==========================================
+
+function buildSudokuSVG(game) {
+
+  const svg = [];
+
+  svg.push(`
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="${IMAGE_SIZE}"
+      height="${IMAGE_SIZE}"
+      viewBox="0 0 ${IMAGE_SIZE} ${IMAGE_SIZE}"
+    >
+  `);
+
+
+  // ========================================
+  // Background
+  // ========================================
+
+  svg.push(`
+    <rect
+      x="0"
+      y="0"
+      width="${IMAGE_SIZE}"
+      height="${IMAGE_SIZE}"
+      fill="#ffffff"
+    />
+  `);
+
+
+  // ========================================
+  // خانه‌ها
+  // ========================================
+
+  for (let row = 0; row < 9; row++) {
+
+    for (let col = 0; col < 9; col++) {
+
+      const index =
+        row * 9 + col;
+
+      const x =
+        PADDING +
+        col * CELL_SIZE;
+
+      const y =
+        PADDING +
+        row * CELL_SIZE;
+
+
+      // ======================================
+      // خانه انتخاب‌شده
+      // ======================================
+
+      if (
+        Number(game.selectedCell) === index
+      ) {
+
+        svg.push(`
+          <rect
+            x="${x}"
+            y="${y}"
+            width="${CELL_SIZE}"
+            height="${CELL_SIZE}"
+            fill="#dbeafe"
+          />
+        `);
+      }
+
+
+      // ======================================
+      // مقدار خانه
+      // ======================================
+
+      const value =
+        game.board?.[index];
+
+
+      if (
+        value !== null &&
+        value !== undefined &&
+        value !== ""
+      ) {
+
+        const fixed =
+          game.puzzle?.[index] !== null &&
+          game.puzzle?.[index] !== undefined;
+
+        const fontSize =
+          Math.floor(
+            CELL_SIZE * 0.52
+          );
+
+        const centerX =
+          x +
+          CELL_SIZE / 2;
+
+        const centerY =
+          y +
+          CELL_SIZE / 2;
+
+        svg.push(`
+          <text
+            x="${centerX}"
+            y="${centerY}"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-family="Arial, sans-serif"
+            font-size="${fontSize}px"
+            font-weight="700"
+            fill="${
+              fixed
+                ? "#111827"
+                : "#2563eb"
+            }"
+          >
+            ${escapeXML(
+              toPersianDigit(value)
+            )}
+          </text>
+        `);
+
+      } else {
+
+        // ====================================
+        // Pencil Notes
+        // ====================================
+
+        const notes =
+          Array.isArray(
+            game.notes?.[index]
+          )
+            ? game.notes[index]
+            : [];
+
+        if (notes.length > 0) {
+
+          const noteSize =
+            Math.floor(
+              CELL_SIZE * 0.19
+            );
+
+
+          for (let n = 1; n <= 9; n++) {
+
+            if (!notes.includes(n)) {
+              continue;
+            }
+
+
+            const noteRow =
+              Math.floor(
+                (n - 1) / 3
+              );
+
+            const noteCol =
+              (n - 1) % 3;
+
+
+            const nx =
+              x +
+              CELL_SIZE *
+              (
+                0.20 +
+                noteCol * 0.30
+              );
+
+
+            const ny =
+              y +
+              CELL_SIZE *
+              (
+                0.20 +
+                noteRow * 0.30
+              );
+
+
+            svg.push(`
+              <text
+                x="${nx}"
+                y="${ny}"
+                text-anchor="middle"
+                dominant-baseline="central"
+                font-family="Arial, sans-serif"
+                font-size="${noteSize}px"
+                fill="#6b7280"
+              >
+                ${escapeXML(
+                  toPersianDigit(n)
+                )}
+              </text>
+            `);
+          }
+        }
+      }
+    }
+  }
+
+
+  // ========================================
+  // خطوط نازک جدول
+  // ========================================
+
+  for (let i = 0; i <= 9; i++) {
+
+    const position =
+      PADDING +
+      i * CELL_SIZE;
+
+
+    svg.push(`
+      <line
+        x1="${position}"
+        y1="${PADDING}"
+        x2="${position}"
+        y2="${IMAGE_SIZE - PADDING}"
+        stroke="#9ca3af"
+        stroke-width="1"
+      />
+    `);
+
+
+    svg.push(`
+      <line
+        x1="${PADDING}"
+        y1="${position}"
+        x2="${IMAGE_SIZE - PADDING}"
+        y2="${position}"
+        stroke="#9ca3af"
+        stroke-width="1"
+      />
+    `);
+  }
+
+
+  // ========================================
+  // خطوط ضخیم 3×3
+  // ========================================
+
+  for (let i = 0; i <= 9; i += 3) {
+
+    const position =
+      PADDING +
+      i * CELL_SIZE;
+
+
+    svg.push(`
+      <line
+        x1="${position}"
+        y1="${PADDING}"
+        x2="${position}"
+        y2="${IMAGE_SIZE - PADDING}"
+        stroke="#111827"
+        stroke-width="3"
+      />
+    `);
+
+
+    svg.push(`
+      <line
+        x1="${PADDING}"
+        y1="${position}"
+        x2="${IMAGE_SIZE - PADDING}"
+        y2="${position}"
+        stroke="#111827"
+        stroke-width="3"
+      />
+    `);
+  }
+
+
+  svg.push("</svg>");
+
+  return svg.join("");
+}
+
+
+// ==========================================
+// SVG → PNG
+// ==========================================
+
+export async function renderSudokuPNG(game) {
+
+  const svg =
+    buildSudokuSVG(game);
+
+
+  const renderer =
+    new Resvg(
+      svg,
+      {
+        fitTo: {
+          mode: "width",
+          value: IMAGE_SIZE
+        }
+      }
+    );
+
+
+  return renderer
+    .render()
+    .asPng();
+}
+// ==========================================
 // src/worker.js
 // Telegram Sudoku Bot
 // Cloudflare Workers + D1
@@ -7,11 +376,14 @@
 import {
   sendMessage,
   editMessageText,
+  sendPhoto,
+  editMessagePhoto,
   answerCallbackQuery
 } from "./telegram.js";
 
+
 import {
-  createGame,
+  newGame,
   selectCell,
   togglePencilMode,
   toggleNote,
@@ -21,7 +393,9 @@ import {
   applyHint
 } from "./game.js";
 
+
 import {
+  buildSudokuKeyboard,
   buildBlockKeyboard,
   buildCellKeyboard,
   buildNumberKeyboard,
@@ -29,17 +403,25 @@ import {
   buildFinishedKeyboard
 } from "./keyboard.js";
 
+
 import {
   generateSudoku,
   getHint
 } from "./sudoku.js";
 
 
+import {
+  renderSudokuPNG
+} from "./sudoku-image.js";
+
+
 // ==========================================
 // تنظیمات
 // ==========================================
 
-const DEFAULT_DIFFICULTY = "medium";
+const DEFAULT_DIFFICULTY =
+  "medium";
+
 
 const VALID_DIFFICULTIES = [
   "easy",
@@ -56,29 +438,46 @@ const VALID_DIFFICULTIES = [
 
 export default {
 
-  async fetch(request, env) {
+  async fetch(
+    request,
+    env
+  ) {
 
-    if (request.method === "GET") {
+    if (
+      request.method === "GET"
+    ) {
+
       return new Response(
         "🧩 Sudoku Bot is running.",
-        { status: 200 }
+        {
+          status: 200
+        }
       );
     }
 
-    if (request.method !== "POST") {
+
+    if (
+      request.method !== "POST"
+    ) {
+
       return new Response(
         "Method Not Allowed",
-        { status: 405 }
+        {
+          status: 405
+        }
       );
     }
+
 
     try {
 
       const update =
         await request.json();
 
+
       const token =
         env.BOT_TOKEN;
+
 
       if (!token) {
 
@@ -86,17 +485,23 @@ export default {
           "BOT_TOKEN is missing."
         );
 
+
         return new Response(
           "BOT_TOKEN is missing.",
-          { status: 500 }
+          {
+            status: 500
+          }
         );
       }
 
-      // --------------------------------------
-      // Message
-      // --------------------------------------
 
-      if (update.message) {
+      // ======================================
+      // Message
+      // ======================================
+
+      if (
+        update.message
+      ) {
 
         await handleMessage(
           update.message,
@@ -105,11 +510,14 @@ export default {
         );
       }
 
-      // --------------------------------------
-      // Callback
-      // --------------------------------------
 
-      if (update.callback_query) {
+      // ======================================
+      // Callback
+      // ======================================
+
+      if (
+        update.callback_query
+      ) {
 
         await handleCallbackQuery(
           update.callback_query,
@@ -118,10 +526,14 @@ export default {
         );
       }
 
+
       return new Response(
         "OK",
-        { status: 200 }
+        {
+          status: 200
+        }
       );
+
 
     } catch (error) {
 
@@ -130,9 +542,12 @@ export default {
         error
       );
 
+
       return new Response(
         "Internal Server Error",
-        { status: 500 }
+        {
+          status: 500
+        }
       );
     }
   }
@@ -153,14 +568,19 @@ async function handleMessage(
     return;
   }
 
+
   const chatId =
-    String(message.chat.id);
+    String(
+      message.chat.id
+    );
+
 
   const userId =
     String(
       message.from?.id ??
       message.chat.id
     );
+
 
   const text =
     String(
@@ -172,7 +592,9 @@ async function handleMessage(
   // /start
   // ========================================
 
-  if (text === "/start") {
+  if (
+    text === "/start"
+  ) {
 
     await sendWelcome(
       token,
@@ -187,7 +609,9 @@ async function handleMessage(
   // /new
   // ========================================
 
-  if (text === "/new") {
+  if (
+    text === "/new"
+  ) {
 
     await startNewGame(
       env,
@@ -207,16 +631,26 @@ async function handleMessage(
 
   const difficultyCommands = {
 
-    "/easy": "easy",
-    "/medium": "medium",
-    "/hard": "hard",
-    "/expert": "expert",
-    "/master": "master"
+    "/easy":
+      "easy",
 
+    "/medium":
+      "medium",
+
+    "/hard":
+      "hard",
+
+    "/expert":
+      "expert",
+
+    "/master":
+      "master"
   };
 
 
-  if (difficultyCommands[text]) {
+  if (
+    difficultyCommands[text]
+  ) {
 
     await startNewGame(
       env,
@@ -234,13 +668,16 @@ async function handleMessage(
   // /game
   // ========================================
 
-  if (text === "/game") {
+  if (
+    text === "/game"
+  ) {
 
     const game =
       await loadGame(
         env,
         chatId
       );
+
 
     if (!game) {
 
@@ -252,6 +689,7 @@ async function handleMessage(
 
       return;
     }
+
 
     await sendGameMessage(
       token,
@@ -267,7 +705,9 @@ async function handleMessage(
   // /help
   // ========================================
 
-  if (text === "/help") {
+  if (
+    text === "/help"
+  ) {
 
     await sendHelp(
       token,
@@ -291,9 +731,13 @@ async function sendWelcome(
   const text = [
 
     "🧩 <b>Sudoku</b>",
+
     "",
+
     "به بازی سودوکو خوش آمدی!",
+
     "",
+
     "درجه سختی را انتخاب کن:"
 
   ].join("\n");
@@ -320,16 +764,27 @@ async function sendHelp(
   const text = [
 
     "🧩 <b>راهنمای Sudoku</b>",
+
     "",
+
     "👆 ابتدا یکی از ۹ بلوک را انتخاب کن.",
+
     "🔲 سپس خانه موردنظر را انتخاب کن.",
+
     "🔢 بعد عدد موردنظر را انتخاب کن.",
+
     "✏️ برای Pencil حالت مداد را روشن کن.",
+
     "🧹 برای پاک کردن عدد استفاده کن.",
+
     "💡 راهنمایی یک حرکت درست انجام می‌دهد.",
+
     "",
+
     "🔒 خانه‌های اولیه قابل تغییر نیستند.",
+
     "",
+
     "👥 بازی در گروه قابل انجام است."
 
   ].join("\n");
@@ -340,62 +795,6 @@ async function sendHelp(
     chatId,
     text
   );
-}
-
-
-// ==========================================
-// آماده‌سازی Game
-// ==========================================
-
-function normalizeGame(game) {
-
-  if (!game) {
-    return null;
-  }
-
-  if (
-    !Array.isArray(game.notes) ||
-    game.notes.length !== 81
-  ) {
-
-    game.notes =
-      Array.from(
-        { length: 81 },
-        () => []
-      );
-  }
-
-  for (
-    let i = 0;
-    i < 81;
-    i++
-  ) {
-
-    if (
-      !Array.isArray(
-        game.notes[i]
-      )
-    ) {
-
-      game.notes[i] = [];
-    }
-  }
-
-  if (
-    !Number.isInteger(
-      game.selectedCell
-    )
-  ) {
-
-    game.selectedCell = -1;
-  }
-
-  game.pencilMode =
-    Boolean(
-      game.pencilMode
-    );
-
-  return game;
 }
 
 
@@ -424,12 +823,14 @@ async function startNewGame(
 
   let generated;
 
+
   try {
 
     generated =
       generateSudoku(
         difficulty
       );
+
 
   } catch (error) {
 
@@ -438,23 +839,23 @@ async function startNewGame(
       error
     );
 
+
     await sendMessage(
       token,
       chatId,
       "❌ ساخت جدول Sudoku با خطا مواجه شد."
     );
 
+
     return;
   }
 
 
   const game =
-    normalizeGame(
-      createGame(
-        difficulty,
-        generated.puzzle,
-        generated.solution
-      )
+    newGame(
+      difficulty,
+      generated.puzzle,
+      generated.solution
     );
 
 
@@ -475,7 +876,7 @@ async function startNewGame(
 
 
 // ==========================================
-// ارسال صفحه بازی
+// ارسال بازی به صورت عکس
 // ==========================================
 
 async function sendGameMessage(
@@ -484,16 +885,23 @@ async function sendGameMessage(
   game
 ) {
 
-  const text =
+  const png =
+    await renderSudokuPNG(
+      game
+    );
+
+
+  const caption =
     createBoardText(
       game
     );
 
 
-  await sendMessage(
+  await sendPhoto(
     token,
     chatId,
-    text,
+    png,
+    caption,
     buildBlockKeyboard(
       game
     )
@@ -502,41 +910,36 @@ async function sendGameMessage(
 
 
 // ==========================================
-// ویرایش صفحه بازی
+// ویرایش بازی به صورت عکس
 // ==========================================
 
 async function editGameMessage(
   token,
   message,
-  game
+  game,
+  keyboard = null
 ) {
 
-  game =
-    normalizeGame(game);
-
-
-  if (
-    game.status === "won"
-  ) {
-
-    await editMessageText(
-      token,
-      message.chat.id,
-      message.message_id,
-      createBoardText(game),
-      buildFinishedKeyboard()
+  const png =
+    await renderSudokuPNG(
+      game
     );
 
-    return;
-  }
+
+  const caption =
+    createBoardText(
+      game
+    );
 
 
-  await editMessageText(
+  await editMessagePhoto(
     token,
     message.chat.id,
     message.message_id,
-    createBoardText(game),
-    buildBlockKeyboard(game)
+    png,
+    caption,
+    keyboard ||
+      buildBlockKeyboard(game)
   );
 }
 
@@ -553,6 +956,7 @@ async function handleCallbackQuery(
 
   const callbackId =
     callback.id;
+
 
   const message =
     callback.message;
@@ -574,11 +978,13 @@ async function handleCallbackQuery(
       message.chat.id
     );
 
+
   const userId =
     String(
       callback.from?.id ??
       message.chat.id
     );
+
 
   const data =
     String(
@@ -618,12 +1024,14 @@ async function handleCallbackQuery(
 
     let generated;
 
+
     try {
 
       generated =
         generateSudoku(
           difficulty
         );
+
 
     } catch (error) {
 
@@ -632,23 +1040,23 @@ async function handleCallbackQuery(
         error
       );
 
+
       await answerCallbackQuery(
         token,
         callbackId,
         "❌ خطا در ساخت جدول."
       );
 
+
       return;
     }
 
 
     const game =
-      normalizeGame(
-        createGame(
-          difficulty,
-          generated.puzzle,
-          generated.solution
-        )
+      newGame(
+        difficulty,
+        generated.puzzle,
+        generated.solution
       );
 
 
@@ -660,10 +1068,17 @@ async function handleCallbackQuery(
     );
 
 
-    await editGameMessage(
+    /*
+     * اینجا پیام قبلی متنی است
+     * بنابراین editMessageText استفاده می‌شود.
+     */
+
+    await editMessageText(
       token,
-      message,
-      game
+      message.chat.id,
+      message.message_id,
+      createBoardText(game),
+      buildBlockKeyboard(game)
     );
 
 
@@ -672,6 +1087,7 @@ async function handleCallbackQuery(
       callbackId,
       "🎮 بازی شروع شد."
     );
+
 
     return;
   }
@@ -682,11 +1098,9 @@ async function handleCallbackQuery(
   // ========================================
 
   const game =
-    normalizeGame(
-      await loadGame(
-        env,
-        chatId
-      )
+    await loadGame(
+      env,
+      chatId
     );
 
 
@@ -734,11 +1148,10 @@ async function handleCallbackQuery(
     }
 
 
-    await editMessageText(
+    await editGameMessage(
       token,
-      message.chat.id,
-      message.message_id,
-      createBoardText(game),
+      message,
+      game,
       buildCellKeyboard(
         block,
         game
@@ -750,6 +1163,7 @@ async function handleCallbackQuery(
       token,
       callbackId
     );
+
 
     return;
   }
@@ -763,12 +1177,13 @@ async function handleCallbackQuery(
     data === "action:blocks"
   ) {
 
-    await editMessageText(
+    await editGameMessage(
       token,
-      message.chat.id,
-      message.message_id,
-      createBoardText(game),
-      buildBlockKeyboard(game)
+      message,
+      game,
+      buildBlockKeyboard(
+        game
+      )
     );
 
 
@@ -776,6 +1191,7 @@ async function handleCallbackQuery(
       token,
       callbackId
     );
+
 
     return;
   }
@@ -806,33 +1222,36 @@ async function handleCallbackQuery(
           selected / 9
         );
 
+
       const col =
         selected % 9;
+
 
       const block =
         Math.floor(row / 3) * 3 +
         Math.floor(col / 3);
 
 
-      await editMessageText(
+      await editGameMessage(
         token,
-        message.chat.id,
-        message.message_id,
-        createBoardText(game),
+        message,
+        game,
         buildCellKeyboard(
           block,
           game
         )
       );
 
+
     } else {
 
-      await editMessageText(
+      await editGameMessage(
         token,
-        message.chat.id,
-        message.message_id,
-        createBoardText(game),
-        buildBlockKeyboard(game)
+        message,
+        game,
+        buildBlockKeyboard(
+          game
+        )
       );
     }
 
@@ -841,6 +1260,7 @@ async function handleCallbackQuery(
       token,
       callbackId
     );
+
 
     return;
   }
@@ -878,27 +1298,10 @@ async function handleCallbackQuery(
     }
 
 
-    // --------------------------------------
-    // انتخاب خانه
-    // --------------------------------------
-
-    const selected =
-      selectCell(
-        game,
-        index
-      );
-
-
-    if (!selected.ok) {
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        selected.message
-      );
-
-      return;
-    }
+    selectCell(
+      game,
+      index
+    );
 
 
     await saveGame(
@@ -909,21 +1312,22 @@ async function handleCallbackQuery(
     );
 
 
-    // --------------------------------------
+    // ======================================
     // خانه ثابت
-    // --------------------------------------
+    // ======================================
 
     if (
       game.puzzle[index] !== null &&
       game.puzzle[index] !== undefined
     ) {
 
-      await editMessageText(
+      await editGameMessage(
         token,
-        message.chat.id,
-        message.message_id,
-        createNumberScreenText(game),
-        buildNumberKeyboard(game)
+        message,
+        game,
+        buildNumberKeyboard(
+          game
+        )
       );
 
 
@@ -933,20 +1337,22 @@ async function handleCallbackQuery(
         "🔒 این خانه ثابت است."
       );
 
+
       return;
     }
 
 
-    // --------------------------------------
+    // ======================================
     // خانه آزاد
-    // --------------------------------------
+    // ======================================
 
-    await editMessageText(
+    await editGameMessage(
       token,
-      message.chat.id,
-      message.message_id,
-      createNumberScreenText(game),
-      buildNumberKeyboard(game)
+      message,
+      game,
+      buildNumberKeyboard(
+        game
+      )
     );
 
 
@@ -954,6 +1360,7 @@ async function handleCallbackQuery(
       token,
       callbackId
     );
+
 
     return;
   }
@@ -967,10 +1374,9 @@ async function handleCallbackQuery(
     data === "mode:pencil"
   ) {
 
-    const enabled =
-      togglePencilMode(
-        game
-      );
+    togglePencilMode(
+      game
+    );
 
 
     await saveGame(
@@ -981,22 +1387,24 @@ async function handleCallbackQuery(
     );
 
 
-    await editMessageText(
+    await editGameMessage(
       token,
-      message.chat.id,
-      message.message_id,
-      createNumberScreenText(game),
-      buildNumberKeyboard(game)
+      message,
+      game,
+      buildNumberKeyboard(
+        game
+      )
     );
 
 
     await answerCallbackQuery(
       token,
       callbackId,
-      enabled
+      game.pencilMode
         ? "✏️ مداد روشن شد."
         : "✏️ مداد خاموش شد."
     );
+
 
     return;
   }
@@ -1010,10 +1418,24 @@ async function handleCallbackQuery(
     data === "mode:erase"
   ) {
 
+    if (
+      game.selectedCell === -1
+    ) {
+
+      await answerCallbackQuery(
+        token,
+        callbackId,
+        "اول یک خانه انتخاب کن."
+      );
+
+      return;
+    }
+
+
     const result =
       eraseNumber(
         game,
-        game
+        game.selectedCell
       );
 
 
@@ -1025,12 +1447,13 @@ async function handleCallbackQuery(
     );
 
 
-    await editMessageText(
+    await editGameMessage(
       token,
-      message.chat.id,
-      message.message_id,
-      createNumberScreenText(game),
-      buildNumberKeyboard(game)
+      message,
+      game,
+      buildNumberKeyboard(
+        game
+      )
     );
 
 
@@ -1041,6 +1464,7 @@ async function handleCallbackQuery(
         ? "🧹 پاک شد."
         : result.message
     );
+
 
     return;
   }
@@ -1092,9 +1516,13 @@ async function handleCallbackQuery(
     }
 
 
-    // --------------------------------------
+    const index =
+      game.selectedCell;
+
+
+    // ======================================
     // Pencil
-    // --------------------------------------
+    // ======================================
 
     if (
       game.pencilMode
@@ -1115,12 +1543,13 @@ async function handleCallbackQuery(
       );
 
 
-      await editMessageText(
+      await editGameMessage(
         token,
-        message.chat.id,
-        message.message_id,
-        createNumberScreenText(game),
-        buildNumberKeyboard(game)
+        message,
+        game,
+        buildNumberKeyboard(
+          game
+        )
       );
 
 
@@ -1136,18 +1565,19 @@ async function handleCallbackQuery(
           : result.message
       );
 
+
       return;
     }
 
 
-    // --------------------------------------
+    // ======================================
     // عدد اصلی
-    // --------------------------------------
+    // ======================================
 
     const result =
       putNumber(
         game,
-        game,
+        index,
         number
       );
 
@@ -1160,19 +1590,18 @@ async function handleCallbackQuery(
     );
 
 
-    // --------------------------------------
+    // ======================================
     // برنده
-    // --------------------------------------
+    // ======================================
 
     if (
       result.won
     ) {
 
-      await editMessageText(
+      await editGameMessage(
         token,
-        message.chat.id,
-        message.message_id,
-        createBoardText(game),
+        message,
+        game,
         buildFinishedKeyboard()
       );
 
@@ -1183,24 +1612,26 @@ async function handleCallbackQuery(
         "🎉 تبریک! Sudoku حل شد."
       );
 
+
       return;
     }
 
 
-    // --------------------------------------
+    // ======================================
     // اشتباه
-    // --------------------------------------
+    // ======================================
 
     if (
       result.mistake
     ) {
 
-      await editMessageText(
+      await editGameMessage(
         token,
-        message.chat.id,
-        message.message_id,
-        createNumberScreenText(game),
-        buildNumberKeyboard(game)
+        message,
+        game,
+        buildNumberKeyboard(
+          game
+        )
       );
 
 
@@ -1210,20 +1641,22 @@ async function handleCallbackQuery(
         `❌ اشتباه! خطا: ${game.mistakes}`
       );
 
+
       return;
     }
 
 
-    // --------------------------------------
+    // ======================================
     // درست
-    // --------------------------------------
+    // ======================================
 
-    await editMessageText(
+    await editGameMessage(
       token,
-      message.chat.id,
-      message.message_id,
-      createBoardText(game),
-      buildBlockKeyboard(game)
+      message,
+      game,
+      buildBlockKeyboard(
+        game
+      )
     );
 
 
@@ -1232,6 +1665,7 @@ async function handleCallbackQuery(
       callbackId,
       "✅ درست!"
     );
+
 
     return;
   }
@@ -1245,7 +1679,8 @@ async function handleCallbackQuery(
     data === "action:hint"
   ) {
 
-    let hintResult = null;
+    let hintResult =
+      null;
 
 
     try {
@@ -1256,6 +1691,7 @@ async function handleCallbackQuery(
           game.solution
         );
 
+
     } catch (error) {
 
       console.error(
@@ -1265,7 +1701,9 @@ async function handleCallbackQuery(
     }
 
 
-    if (!hintResult) {
+    if (
+      !hintResult
+    ) {
 
       await answerCallbackQuery(
         token,
@@ -1280,7 +1718,7 @@ async function handleCallbackQuery(
     const result =
       applyHint(
         game,
-        game,
+        game.selectedCell,
         hintResult.index,
         hintResult.number
       );
@@ -1298,11 +1736,10 @@ async function handleCallbackQuery(
       result.won
     ) {
 
-      await editMessageText(
+      await editGameMessage(
         token,
-        message.chat.id,
-        message.message_id,
-        createBoardText(game),
+        message,
+        game,
         buildFinishedKeyboard()
       );
 
@@ -1313,16 +1750,18 @@ async function handleCallbackQuery(
         "🎉 راهنمایی باعث تکمیل جدول شد."
       );
 
+
       return;
     }
 
 
-    await editMessageText(
+    await editGameMessage(
       token,
-      message.chat.id,
-      message.message_id,
-      createBoardText(game),
-      buildBlockKeyboard(game)
+      message,
+      game,
+      buildBlockKeyboard(
+        game
+      )
     );
 
 
@@ -1331,6 +1770,7 @@ async function handleCallbackQuery(
       callbackId,
       result.message
     );
+
 
     return;
   }
@@ -1344,39 +1784,17 @@ async function handleCallbackQuery(
     data === "action:new"
   ) {
 
-    let freshGenerated;
-
-    try {
-
-      freshGenerated =
-        generateSudoku(
-          game.difficulty
-        );
-
-    } catch (error) {
-
-      console.error(
-        "New game generation error:",
-        error
+    const freshGenerated =
+      generateSudoku(
+        game.difficulty
       );
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "❌ ساخت بازی جدید ناموفق بود."
-      );
-
-      return;
-    }
 
 
     const freshGame =
-      normalizeGame(
-        createGame(
-          game.difficulty,
-          freshGenerated.puzzle,
-          freshGenerated.solution
-        )
+      newGame(
+        game.difficulty,
+        freshGenerated.puzzle,
+        freshGenerated.solution
       );
 
 
@@ -1388,10 +1806,18 @@ async function handleCallbackQuery(
     );
 
 
+    /*
+     * چون پیام فعلی عکس است،
+     * باید عکس را ویرایش کنیم.
+     */
+
     await editGameMessage(
       token,
       message,
-      freshGame
+      freshGame,
+      buildBlockKeyboard(
+        freshGame
+      )
     );
 
 
@@ -1400,6 +1826,7 @@ async function handleCallbackQuery(
       callbackId,
       "🔄 بازی جدید ساخته شد."
     );
+
 
     return;
   }
@@ -1417,7 +1844,7 @@ async function handleCallbackQuery(
 
 
 // ==========================================
-// متن جدول
+// متن کپشن بازی
 // ==========================================
 
 function createBoardText(
@@ -1426,9 +1853,11 @@ function createBoardText(
 
   const lines = [];
 
+
   lines.push(
     "🧩 <b>Sudoku</b>"
   );
+
 
   lines.push(
     `🎯 سطح: ${getDifficultyName(
@@ -1436,69 +1865,26 @@ function createBoardText(
     )}`
   );
 
-  lines.push(
-    `📊 پیشرفت: ${getProgress(game)}%`
-  );
 
   lines.push(
-    `❌ اشتباه: ${game.mistakes || 0}`
+    `📊 پیشرفت: ${
+      getProgress(game)
+    }%`
   );
+
 
   lines.push(
-    `💡 راهنمایی: ${game.hints || 0}`
+    `❌ اشتباه: ${
+      game.mistakes || 0
+    }`
   );
 
-  lines.push("");
 
-
-  for (
-    let row = 0;
-    row < 9;
-    row++
-  ) {
-
-    const cells = [];
-
-    for (
-      let col = 0;
-      col < 9;
-      col++
-    ) {
-
-      const index =
-        row * 9 + col;
-
-      const value =
-        game.board[index];
-
-      cells.push(
-        value !== null &&
-        value !== undefined
-          ? String(value)
-          : "·"
-      );
-    }
-
-
-    lines.push(
-      cells.slice(0, 3).join(" ") +
-      " │ " +
-      cells.slice(3, 6).join(" ") +
-      " │ " +
-      cells.slice(6, 9).join(" ")
-    );
-
-
-    if (
-      row === 2 ||
-      row === 5
-    ) {
-
-      lines.push(
-        "──────┼──────┼──────"
-      );
-    }
-  }
+  lines.push(
+    `💡 راهنمایی: ${
+      game.hints || 0
+    }`
+  );
 
 
   lines.push("");
@@ -1515,85 +1901,14 @@ function createBoardText(
   } else {
 
     lines.push(
-      "👆 ابتدا یکی از ۹ بلوک را انتخاب کن."
+      "👆 یکی از ۹ بلوک را انتخاب کن."
     );
   }
 
 
-  return lines.join("\n");
-}
-
-
-// ==========================================
-// صفحه انتخاب عدد
-// ==========================================
-
-function createNumberScreenText(
-  game
-) {
-
-  const index =
-    Number(
-      game.selectedCell
-    );
-
-
-  if (
-    !Number.isInteger(index) ||
-    index < 0 ||
-    index >= 81
-  ) {
-
-    return [
-      "🔢 <b>انتخاب عدد</b>",
-      "",
-      "اول یک خانه را انتخاب کن."
-    ].join("\n");
-  }
-
-
-  const row =
-    Math.floor(index / 9) + 1;
-
-  const col =
-    (index % 9) + 1;
-
-  const value =
-    game.board[index];
-
-  const notes =
-    Array.isArray(
-      game.notes?.[index]
-    )
-      ? game.notes[index]
-      : [];
-
-
-  return [
-
-    "🔢 <b>انتخاب عدد</b>",
-
-    "",
-
-    `📍 خانه: سطر ${row}، ستون ${col}`,
-
-    `🔢 مقدار فعلی: ${
-      value ?? "خالی"
-    }`,
-
-    `✏️ Pencil: ${
-      notes.length
-        ? notes.join(" ")
-        : "—"
-    }`,
-
-    "",
-
-    game.pencilMode
-      ? "✏️ <b>حالت مداد فعال است</b>"
-      : "عدد موردنظر را انتخاب کن:"
-
-  ].join("\n");
+  return lines.join(
+    "\n"
+  );
 }
 
 
@@ -1607,15 +1922,20 @@ function getDifficultyName(
 
   const names = {
 
-    easy: "🟢 آسان",
+    easy:
+      "🟢 آسان",
 
-    medium: "🟡 متوسط",
+    medium:
+      "🟡 متوسط",
 
-    hard: "🔴 سخت",
+    hard:
+      "🔴 سخت",
 
-    expert: "🟣 خیلی سخت",
+    expert:
+      "🟣 خیلی سخت",
 
-    master: "⚫ استاد"
+    master:
+      "⚫ استاد"
 
   };
 
@@ -1761,7 +2081,7 @@ async function loadGame(
   }
 
 
-  const game = {
+  return {
 
     puzzle:
       safeJSON(
@@ -1793,8 +2113,7 @@ async function loadGame(
       ),
 
     difficulty:
-      row.difficulty ||
-      DEFAULT_DIFFICULTY,
+      row.difficulty,
 
     mistakes:
       Number(
@@ -1812,8 +2131,7 @@ async function loadGame(
       ),
 
     status:
-      row.status ||
-      "playing",
+      row.status,
 
     createdAt:
       Number(
@@ -1825,11 +2143,6 @@ async function loadGame(
         row.updated_at || 0
       )
   };
-
-
-  return normalizeGame(
-    game
-  );
 }
 
 
@@ -1853,20 +2166,13 @@ function safeJSON(
     }
 
 
-    if (
-      typeof value !== "string"
-    ) {
-
-      return value;
-    }
-
-
     return JSON.parse(
       value
     );
+
 
   } catch {
 
     return fallback;
   }
-        }
+}
