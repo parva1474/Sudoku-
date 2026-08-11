@@ -1373,7 +1373,6 @@ async function handleCallbackQuery(
     return;
   }
 
-
   // ========================================
   // Unknown Callback
   // ========================================
@@ -1383,7 +1382,6 @@ async function handleCallbackQuery(
     callbackId
   );
 }
-
 
 // ==========================================
 // ویرایش صفحه انتخاب عدد
