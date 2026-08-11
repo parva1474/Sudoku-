@@ -1,47 +1,64 @@
 // ==========================================
 // src/game.js
 // Sudoku Game Engine
-// Cloudflare Workers + D1
-// Multiplayer
 // ==========================================
+
+const MAX_MISTAKES = 3;
+
 
 // ==========================================
 // ساخت بازی جدید
 // ==========================================
 
-export function createGame(
+export function newGame(
   difficulty,
   puzzle,
   solution
 ) {
 
-  const now =
-    Date.now();
+  const cleanPuzzle =
+    Array.isArray(puzzle)
+      ? [...puzzle]
+      : [];
 
-  const gameId =
-    crypto.randomUUID();
+  const cleanSolution =
+    Array.isArray(solution)
+      ? [...solution]
+      : [];
+
+  if (
+    cleanPuzzle.length !== 81 ||
+    cleanSolution.length !== 81
+  ) {
+    throw new Error(
+      "Invalid Sudoku puzzle or solution."
+    );
+  }
 
   return {
 
-    id:
-      gameId,
-
-    difficulty:
-      difficulty || "medium",
+    difficulty,
 
     puzzle:
-      [...puzzle],
+      cleanPuzzle,
 
     solution:
-      [...solution],
+      cleanSolution,
 
     board:
-      puzzle.map(
-        value =>
-          value === null
-            ? null
-            : value
+      [...cleanPuzzle],
+
+    notes:
+      Array.from(
+        { length: 81 },
+        () => []
       ),
+
+    selectedCell:
+      -1,
+
+    pencilMode:
+      false,
 
     mistakes:
       0,
@@ -53,50 +70,6 @@ export function createGame(
       "playing",
 
     createdAt:
-      now,
-
-    updatedAt:
-      now
-  };
-}
-
-// ==========================================
-// ساخت بازیکن
-// ==========================================
-
-export function createPlayer(
-  user
-) {
-
-  return {
-
-    userId:
-      String(user.id),
-
-    username:
-      user.username ||
-      null,
-
-    firstName:
-      user.first_name ||
-      "",
-
-    selectedCell:
-      -1,
-
-    pencilMode:
-      false,
-
-    notes:
-      [],
-
-    mistakes:
-      0,
-
-    hints:
-      0,
-
-    joinedAt:
       Date.now(),
 
     updatedAt:
@@ -104,23 +77,225 @@ export function createPlayer(
   };
 }
 
+
 // ==========================================
 // انتخاب خانه
 // ==========================================
 
 export function selectCell(
-  player,
+  game,
   index
 ) {
 
+  index =
+    Number(index);
+
   if (
-    !player
+    !Number.isInteger(index) ||
+    index < 0 ||
+    index >= 81
+  ) {
+    return false;
+  }
+
+  game.selectedCell =
+    index;
+
+  game.updatedAt =
+    Date.now();
+
+  return true;
+}
+
+
+// ==========================================
+// تغییر حالت مداد
+// ==========================================
+
+export function togglePencilMode(
+  game
+) {
+
+  game.pencilMode =
+    !game.pencilMode;
+
+  game.updatedAt =
+    Date.now();
+
+  return game.pencilMode;
+}
+
+
+// ==========================================
+// بررسی خانه ثابت
+// ==========================================
+
+function isFixed(
+  game,
+  index
+) {
+
+  return (
+    game.puzzle[index] !== null &&
+    game.puzzle[index] !== undefined
+  );
+}
+
+
+// ==========================================
+// بررسی عدد معتبر
+// ==========================================
+
+function isValidNumber(
+  number
+) {
+
+  return (
+    Number.isInteger(number) &&
+    number >= 1 &&
+    number <= 9
+  );
+}
+
+
+// ==========================================
+// مداد
+// ==========================================
+
+export function toggleNote(
+  game,
+  number
+) {
+
+  const index =
+    Number(
+      game.selectedCell
+    );
+
+  if (
+    !Number.isInteger(index) ||
+    index < 0 ||
+    index >= 81
   ) {
 
     return {
       ok: false,
       message:
-        "بازیکن پیدا نشد."
+        "اول یک خانه انتخاب کن."
+    };
+  }
+
+  if (
+    isFixed(game, index)
+  ) {
+
+    return {
+      ok: false,
+      message:
+        "🔒 این خانه ثابت است."
+    };
+  }
+
+  if (
+    !isValidNumber(number)
+  ) {
+
+    return {
+      ok: false,
+      message:
+        "عدد نامعتبر است."
+    };
+  }
+
+  if (
+    game.board[index] !== null &&
+    game.board[index] !== undefined
+  ) {
+
+    return {
+      ok: false,
+      message:
+        "ابتدا عدد خانه را پاک کن."
+    };
+  }
+
+  if (
+    !Array.isArray(
+      game.notes[index]
+    )
+  ) {
+
+    game.notes[index] =
+      [];
+  }
+
+  const position =
+    game.notes[index].indexOf(
+      number
+    );
+
+  let added;
+
+  if (
+    position === -1
+  ) {
+
+    game.notes[index].push(
+      number
+    );
+
+    game.notes[index].sort(
+      (a, b) => a - b
+    );
+
+    added =
+      true;
+
+  } else {
+
+    game.notes[index].splice(
+      position,
+      1
+    );
+
+    added =
+      false;
+  }
+
+  game.updatedAt =
+    Date.now();
+
+  return {
+    ok: true,
+    added
+  };
+}
+
+
+// ==========================================
+// قرار دادن عدد
+// ==========================================
+
+export function putNumber(
+  game,
+  index,
+  number
+) {
+
+  index =
+    Number(index);
+
+  number =
+    Number(number);
+
+  if (
+    game.status !== "playing"
+  ) {
+
+    return {
+      ok: false,
+      message:
+        "بازی تمام شده است."
     };
   }
 
@@ -137,60 +312,8 @@ export function selectCell(
     };
   }
 
-  player.selectedCell =
-    index;
-
-  player.updatedAt =
-    Date.now();
-
-  return {
-    ok: true
-  };
-}
-
-// ==========================================
-// مداد
-// ==========================================
-
-export function togglePencilMode(
-  player
-) {
-
-  player.pencilMode =
-    !Boolean(
-      player.pencilMode
-    );
-
-  player.updatedAt =
-    Date.now();
-
-  return player.pencilMode;
-}
-
-// ==========================================
-// یادداشت‌های مداد
-// ==========================================
-
-export function toggleNote(
-  player,
-  number
-) {
-
   if (
-    !player
-  ) {
-
-    return {
-      ok: false,
-      message:
-        "بازیکن پیدا نشد."
-    };
-  }
-
-  if (
-    !Number.isInteger(number) ||
-    number < 1 ||
-    number > 9
+    !isValidNumber(number)
   ) {
 
     return {
@@ -201,53 +324,88 @@ export function toggleNote(
   }
 
   if (
-    !Array.isArray(
-      player.notes
-    )
+    isFixed(game, index)
   ) {
-
-    player.notes = [];
-  }
-
-  const position =
-    player.notes.indexOf(
-      number
-    );
-
-  if (
-    position === -1
-  ) {
-
-    player.notes.push(
-      number
-    );
-
-    player.notes.sort(
-      (a, b) => a - b
-    );
-
-    player.updatedAt =
-      Date.now();
 
     return {
-      ok: true,
-      added: true
+      ok: false,
+      message:
+        "🔒 این خانه ثابت است."
     };
   }
 
-  player.notes.splice(
-    position,
-    1
-  );
+  // اگر عدد صحیح بود
+  if (
+    number === game.solution[index]
+  ) {
 
-  player.updatedAt =
+    game.board[index] =
+      number;
+
+    game.notes[index] =
+      [];
+
+    removeNumberFromRelatedNotes(
+      game,
+      index,
+      number
+    );
+
+    game.updatedAt =
+      Date.now();
+
+    const won =
+      checkWon(game);
+
+    if (won) {
+
+      game.status =
+        "won";
+    }
+
+    return {
+      ok: true,
+      correct: true,
+      won
+    };
+  }
+
+
+  // جواب غلط
+  game.mistakes =
+    Number(game.mistakes || 0) + 1;
+
+  game.updatedAt =
     Date.now();
 
+
+  if (
+    game.mistakes >= MAX_MISTAKES
+  ) {
+
+    game.status =
+      "lost";
+
+    return {
+      ok: false,
+      correct: false,
+      mistake: true,
+      lost: true,
+      message:
+        "❌ تعداد خطاها به حد مجاز رسید."
+    };
+  }
+
   return {
-    ok: true,
-    added: false
+    ok: false,
+    correct: false,
+    mistake: true,
+    lost: false,
+    message:
+      "❌ عدد اشتباه است."
   };
 }
+
 
 // ==========================================
 // پاک کردن عدد
@@ -255,25 +413,11 @@ export function toggleNote(
 
 export function eraseNumber(
   game,
-  player
+  index
 ) {
 
-  if (
-    !game ||
-    !player
-  ) {
-
-    return {
-      ok: false,
-      message:
-        "بازی یا بازیکن پیدا نشد."
-    };
-  }
-
-  const index =
-    Number(
-      player.selectedCell
-    );
+  index =
+    Number(index);
 
   if (
     !Number.isInteger(index) ||
@@ -284,15 +428,12 @@ export function eraseNumber(
     return {
       ok: false,
       message:
-        "اول یک خانه انتخاب کن."
+        "خانه نامعتبر است."
     };
   }
 
-  // خانه ثابت قابل پاک شدن نیست
-
   if (
-    game.puzzle[index] !== null &&
-    game.puzzle[index] !== undefined
+    isFixed(game, index)
   ) {
 
     return {
@@ -305,12 +446,10 @@ export function eraseNumber(
   game.board[index] =
     null;
 
-  player.notes = [];
+  game.notes[index] =
+    [];
 
   game.updatedAt =
-    Date.now();
-
-  player.updatedAt =
     Date.now();
 
   return {
@@ -318,198 +457,6 @@ export function eraseNumber(
   };
 }
 
-// ==========================================
-// قرار دادن عدد
-// ==========================================
-
-export function putNumber(
-  game,
-  player,
-  number
-) {
-
-  if (
-    !game ||
-    !player
-  ) {
-
-    return {
-      ok: false,
-      message:
-        "بازی یا بازیکن پیدا نشد."
-    };
-  }
-
-  const index =
-    Number(
-      player.selectedCell
-    );
-
-  if (
-    !Number.isInteger(index) ||
-    index < 0 ||
-    index >= 81
-  ) {
-
-    return {
-      ok: false,
-      message:
-        "اول یک خانه انتخاب کن."
-    };
-  }
-
-  if (
-    !Number.isInteger(number) ||
-    number < 1 ||
-    number > 9
-  ) {
-
-    return {
-      ok: false,
-      message:
-        "عدد نامعتبر است."
-    };
-  }
-
-  // ----------------------------------------
-  // خانه ثابت
-  // ----------------------------------------
-
-  if (
-    game.puzzle[index] !== null &&
-    game.puzzle[index] !== undefined
-  ) {
-
-    return {
-      ok: false,
-      message:
-        "🔒 این خانه ثابت است."
-    };
-  }
-
-  // ----------------------------------------
-  // عدد صحیح
-  // ----------------------------------------
-
-  if (
-    Number(
-      game.solution[index]
-    ) === number
-  ) {
-
-    game.board[index] =
-      number;
-
-    player.notes = [];
-
-    game.updatedAt =
-      Date.now();
-
-    player.updatedAt =
-      Date.now();
-
-    const won =
-      checkSolved(
-        game
-      );
-
-    if (
-      won
-    ) {
-
-      game.status =
-        "won";
-    }
-
-    return {
-
-      ok: true,
-
-      correct: true,
-
-      mistake: false,
-
-      won
-    };
-  }
-
-  // ----------------------------------------
-  // عدد اشتباه
-  // ----------------------------------------
-
-  player.mistakes =
-    Number(
-      player.mistakes || 0
-    ) + 1;
-
-  game.mistakes =
-    Number(
-      game.mistakes || 0
-    ) + 1;
-
-  game.updatedAt =
-    Date.now();
-
-  player.updatedAt =
-    Date.now();
-
-  return {
-
-    ok: false,
-
-    correct: false,
-
-    mistake: true,
-
-    won: false,
-
-    message:
-      "❌ عدد اشتباه است."
-  };
-}
-
-// ==========================================
-// بررسی حل شدن
-// ==========================================
-
-export function checkSolved(
-  game
-) {
-
-  if (
-    !game ||
-    !Array.isArray(game.board) ||
-    !Array.isArray(game.solution)
-  ) {
-
-    return false;
-  }
-
-  if (
-    game.board.length !== 81 ||
-    game.solution.length !== 81
-  ) {
-
-    return false;
-  }
-
-  for (
-    let i = 0;
-    i < 81;
-    i++
-  ) {
-
-    if (
-      Number(game.board[i]) !==
-      Number(game.solution[i])
-    ) {
-
-      return false;
-    }
-  }
-
-  return true;
-}
 
 // ==========================================
 // پیشرفت
@@ -519,36 +466,83 @@ export function getProgress(
   game
 ) {
 
-  if (
-    !game ||
-    !Array.isArray(game.board)
-  ) {
-
-    return 0;
-  }
-
-  let filled =
-    0;
+  let fixed = 0;
+  let filled = 0;
 
   for (
-    const value of game.board
+    let i = 0;
+    i < 81;
+    i++
   ) {
 
     if (
-      value !== null &&
-      value !== undefined
+      game.puzzle[i] !== null &&
+      game.puzzle[i] !== undefined
     ) {
+      fixed++;
+    }
 
+    if (
+      game.board[i] !== null &&
+      game.board[i] !== undefined
+    ) {
       filled++;
     }
   }
 
-  return Math.round(
-    (
-      filled / 81
-    ) * 100
+  const totalToFill =
+    81 - fixed;
+
+  if (
+    totalToFill <= 0
+  ) {
+    return 100;
+  }
+
+  const playerFilled =
+    filled - fixed;
+
+  return Math.max(
+    0,
+    Math.min(
+      100,
+      Math.floor(
+        (
+          playerFilled /
+          totalToFill
+        ) * 100
+      )
+    )
   );
 }
+
+
+// ==========================================
+// بررسی برنده شدن
+// ==========================================
+
+function checkWon(
+  game
+) {
+
+  for (
+    let i = 0;
+    i < 81;
+    i++
+  ) {
+
+    if (
+      game.board[i] !==
+      game.solution[i]
+    ) {
+
+      return false;
+    }
+  }
+
+  return true;
+}
+
 
 // ==========================================
 // راهنمایی
@@ -556,22 +550,35 @@ export function getProgress(
 
 export function applyHint(
   game,
-  player,
-  index,
-  number
+  selectedCell,
+  hintIndex,
+  hintNumber
 ) {
 
+  let index =
+    Number(hintIndex);
+
+  const selected =
+    Number(selectedCell);
+
+
+  // اگر خانه انتخاب شده معتبر باشد
+  // اولویت با همان خانه است.
   if (
-    !game ||
-    !player
+    Number.isInteger(selected) &&
+    selected >= 0 &&
+    selected < 81 &&
+    !isFixed(game, selected) &&
+    (
+      game.board[selected] === null ||
+      game.board[selected] === undefined
+    )
   ) {
 
-    return {
-      ok: false,
-      message:
-        "بازی یا بازیکن پیدا نشد."
-    };
+    index =
+      selected;
   }
+
 
   if (
     !Number.isInteger(index) ||
@@ -582,279 +589,183 @@ export function applyHint(
     return {
       ok: false,
       message:
-        "خانه نامعتبر است."
+        "خانه مناسبی برای راهنمایی پیدا نشد."
     };
   }
 
+
   if (
-    game.puzzle[index] !== null &&
-    game.puzzle[index] !== undefined
+    isFixed(game, index)
   ) {
 
     return {
       ok: false,
       message:
-        "این خانه از قبل پر شده است."
+        "این خانه از قبل ثابت است."
     };
   }
 
-  const correctNumber =
-    Number(
-      game.solution[index]
-    );
 
   if (
-    !Number.isInteger(correctNumber)
+    game.board[index] !== null &&
+    game.board[index] !== undefined
   ) {
 
     return {
       ok: false,
       message:
-        "راهنمایی در دسترس نیست."
+        "این خانه قبلاً پر شده است."
     };
   }
+
 
   game.board[index] =
-    correctNumber;
+    hintNumber;
 
-  player.hints =
-    Number(
-      player.hints || 0
-    ) + 1;
+  game.notes[index] =
+    [];
 
   game.hints =
-    Number(
-      game.hints || 0
-    ) + 1;
+    Number(game.hints || 0) + 1;
 
-  player.notes = [];
+  removeNumberFromRelatedNotes(
+    game,
+    index,
+    hintNumber
+  );
 
   game.updatedAt =
     Date.now();
 
-  player.updatedAt =
-    Date.now();
 
   const won =
-    checkSolved(
-      game
-    );
+    checkWon(game);
 
-  if (
-    won
-  ) {
+  if (won) {
 
     game.status =
       "won";
   }
 
+
   return {
-
     ok: true,
-
     won,
-
+    index,
     number:
-      correctNumber,
-
+      hintNumber,
     message:
-      `💡 عدد صحیح: ${correctNumber}`
+      `💡 عدد ${hintNumber} در خانه قرار گرفت.`
   };
 }
 
+
 // ==========================================
-// پاک کردن یادداشت بازیکن
+// حذف مداد مرتبط
 // ==========================================
 
-export function clearNotes(
-  player
+function removeNumberFromRelatedNotes(
+  game,
+  index,
+  number
+) {
+
+  const row =
+    Math.floor(index / 9);
+
+  const col =
+    index % 9;
+
+
+  // سطر
+  for (
+    let c = 0;
+    c < 9;
+    c++
+  ) {
+
+    removeNote(
+      game,
+      row * 9 + c,
+      number
+    );
+  }
+
+
+  // ستون
+  for (
+    let r = 0;
+    r < 9;
+    r++
+  ) {
+
+    removeNote(
+      game,
+      r * 9 + col,
+      number
+    );
+  }
+
+
+  // بلوک
+  const blockRow =
+    Math.floor(row / 3) * 3;
+
+  const blockCol =
+    Math.floor(col / 3) * 3;
+
+  for (
+    let r = blockRow;
+    r < blockRow + 3;
+    r++
+  ) {
+
+    for (
+      let c = blockCol;
+      c < blockCol + 3;
+      c++
+    ) {
+
+      removeNote(
+        game,
+        r * 9 + c,
+        number
+      );
+    }
+  }
+}
+
+
+// ==========================================
+// حذف یک یادداشت
+// ==========================================
+
+function removeNote(
+  game,
+  index,
+  number
 ) {
 
   if (
-    !player
+    !Array.isArray(
+      game.notes?.[index]
+    )
   ) {
-
     return;
   }
 
-  player.notes =
-    [];
-
-  player.updatedAt =
-    Date.now();
-}
-
-// ==========================================
-// تبدیل Row دیتابیس به Game
-// ==========================================
-
-export function gameFromRow(
-  row
-) {
+  const position =
+    game.notes[index].indexOf(
+      number
+    );
 
   if (
-    !row
+    position !== -1
   ) {
 
-    return null;
-  }
-
-  return {
-
-    id:
-      row.id,
-
-    chatId:
-      String(
-        row.chat_id
-      ),
-
-    messageId:
-      row.message_id === null
-        ? null
-        : Number(
-            row.message_id
-          ),
-
-    difficulty:
-      row.difficulty,
-
-    puzzle:
-      JSON.parse(
-        row.puzzle
-      ),
-
-    solution:
-      JSON.parse(
-        row.solution
-      ),
-
-    board:
-      JSON.parse(
-        row.board
-      ),
-
-    mistakes:
-      Number(
-        row.mistakes || 0
-      ),
-
-    hints:
-      Number(
-        row.hints || 0
-      ),
-
-    status:
-      row.status,
-
-    createdAt:
-      Number(
-        row.created_at
-      ),
-
-    updatedAt:
-      Number(
-        row.updated_at
-      )
-  };
-}
-
-// ==========================================
-// تبدیل Row دیتابیس به Player
-// ==========================================
-
-export function playerFromRow(
-  row
-) {
-
-  if (
-    !row
-  ) {
-
-    return null;
-  }
-
-  return {
-
-    id:
-      Number(
-        row.id
-      ),
-
-    gameId:
-      row.game_id,
-
-    userId:
-      String(
-        row.user_id
-      ),
-
-    username:
-      row.username ||
-      null,
-
-    firstName:
-      row.first_name ||
-      "",
-
-    selectedCell:
-      Number(
-        row.selected_cell ?? -1
-      ),
-
-    pencilMode:
-      Boolean(
-        row.pencil_mode
-      ),
-
-    notes:
-      safeJSON(
-        row.notes,
-        []
-      ),
-
-    mistakes:
-      Number(
-        row.mistakes || 0
-      ),
-
-    hints:
-      Number(
-        row.hints || 0
-      ),
-
-    joinedAt:
-      Number(
-        row.joined_at
-      ),
-
-    updatedAt:
-      Number(
-        row.updated_at
-      )
-  };
-}
-
-// ==========================================
-// JSON امن
-// ==========================================
-
-function safeJSON(
-  value,
-  fallback
-) {
-
-  try {
-
-    const parsed =
-      JSON.parse(
-        value
-      );
-
-    return parsed;
-
-  } catch {
-
-    return fallback;
+    game.notes[index].splice(
+      position,
+      1
+    );
   }
 }
