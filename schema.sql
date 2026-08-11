@@ -1,14 +1,14 @@
 -- ==========================================
--- Sudoku Bot
+-- schema.sql
+-- Telegram Sudoku
 -- Cloudflare D1
--- Multiplayer Group Schema
+-- Multiplayer Inline Game
 -- ==========================================
 
 PRAGMA foreign_keys = ON;
 
 -- ==========================================
--- Games
--- یک رکورد برای هر بازی
+-- بازی‌ها
 -- ==========================================
 
 CREATE TABLE IF NOT EXISTS games (
@@ -19,15 +19,23 @@ CREATE TABLE IF NOT EXISTS games (
 
     message_id INTEGER,
 
+    difficulty TEXT NOT NULL
+        DEFAULT 'medium',
+
     puzzle TEXT NOT NULL,
 
     solution TEXT NOT NULL,
 
     board TEXT NOT NULL,
 
-    difficulty TEXT NOT NULL DEFAULT 'medium',
+    mistakes INTEGER NOT NULL
+        DEFAULT 0,
 
-    status TEXT NOT NULL DEFAULT 'waiting',
+    hints INTEGER NOT NULL
+        DEFAULT 0,
+
+    status TEXT NOT NULL
+        DEFAULT 'playing',
 
     created_at INTEGER NOT NULL,
 
@@ -35,8 +43,7 @@ CREATE TABLE IF NOT EXISTS games (
 );
 
 -- ==========================================
--- Players
--- وضعیت اختصاصی هر بازیکن
+-- بازیکنان هر بازی
 -- ==========================================
 
 CREATE TABLE IF NOT EXISTS players (
@@ -51,41 +58,57 @@ CREATE TABLE IF NOT EXISTS players (
 
     first_name TEXT,
 
-    selected_cell INTEGER NOT NULL DEFAULT -1,
+    selected_cell INTEGER NOT NULL
+        DEFAULT -1,
 
-    notes TEXT NOT NULL DEFAULT '[]',
+    pencil_mode INTEGER NOT NULL
+        DEFAULT 0,
 
-    mistakes INTEGER NOT NULL DEFAULT 0,
+    notes TEXT NOT NULL
+        DEFAULT '[]',
 
-    hints INTEGER NOT NULL DEFAULT 0,
+    mistakes INTEGER NOT NULL
+        DEFAULT 0,
 
-    pencil_mode INTEGER NOT NULL DEFAULT 0,
-
-    score INTEGER NOT NULL DEFAULT 0,
+    hints INTEGER NOT NULL
+        DEFAULT 0,
 
     joined_at INTEGER NOT NULL,
 
     updated_at INTEGER NOT NULL,
 
-    UNIQUE(game_id, user_id),
+    UNIQUE (
+        game_id,
+        user_id
+    ),
 
-    FOREIGN KEY(game_id)
-        REFERENCES games(id)
-        ON DELETE CASCADE
+    FOREIGN KEY (
+        game_id
+    )
+    REFERENCES games(id)
+    ON DELETE CASCADE
 );
 
 -- ==========================================
--- ایندکس‌ها
+-- ایندکس بازی
 -- ==========================================
 
-CREATE INDEX IF NOT EXISTS idx_games_chat
+CREATE INDEX IF NOT EXISTS
+idx_games_chat
 ON games(chat_id);
 
-CREATE INDEX IF NOT EXISTS idx_games_status
-ON games(status);
+-- ==========================================
+-- ایندکس بازیکنان
+-- ==========================================
 
-CREATE INDEX IF NOT EXISTS idx_players_game
+CREATE INDEX IF NOT EXISTS
+idx_players_game
 ON players(game_id);
 
-CREATE INDEX IF NOT EXISTS idx_players_user
+CREATE INDEX IF NOT EXISTS
+idx_players_user
 ON players(user_id);
+
+-- ==========================================
+-- پایان
+-- ==========================================
