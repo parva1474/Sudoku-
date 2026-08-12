@@ -1,11 +1,11 @@
 // ==========================================
-// src/keyboard.js - نسخه نهایی
+// src/keyboard.js - نسخه کامل کیبردها
 // ==========================================
 
 export function buildSudokuGridKeyboard(board, selectedCell = -1) {
   const keyboard = [];
   
-  // دکمه‌های ناوبری سریع برای انتخاب سطرها/بخش‌ها
+  // دکمه‌های انتخاب سطر ۱ تا ۹
   keyboard.push([
     { text: "1️⃣ سطر ۱", callback_data: "row:0" },
     { text: "2️⃣ سطر ۲", callback_data: "row:1" },
@@ -24,8 +24,7 @@ export function buildSudokuGridKeyboard(board, selectedCell = -1) {
 
   keyboard.push([
     { text: "✏️ مداد", callback_data: "mode:pencil" },
-    { text: "🧹 پاک کردن", callback_data: "mode:erase" },
-    { text: "💡 راهنمایی", callback_data: "action:hint" }
+    { text: "🧹 پاک کردن", callback_data: "mode:erase" }
   ]);
   
   keyboard.push([
@@ -39,22 +38,22 @@ export function buildNumberKeyboard(game) {
   return {
     inline_keyboard: [
       [
-        { text: "1", callback_data: "num:1" },
-        { text: "2", callback_data: "num:2" },
-        { text: "3", callback_data: "num:3" }
+        { text: "1️⃣", callback_data: "num:1" },
+        { text: "2️⃣", callback_data: "num:2" },
+        { text: "3️⃣", callback_data: "num:3" }
       ],
       [
-        { text: "4", callback_data: "num:4" },
-        { text: "5", callback_data: "num:5" },
-        { text: "6", callback_data: "num:6" }
+        { text: "4️⃣", callback_data: "num:4" },
+        { text: "5️⃣", callback_data: "num:5" },
+        { text: "6️⃣", callback_data: "num:6" }
       ],
       [
-        { text: "7", callback_data: "num:7" },
-        { text: "8", callback_data: "num:8" },
-        { text: "9", callback_data: "num:9" }
+        { text: "7️⃣", callback_data: "num:7" },
+        { text: "8️⃣", callback_data: "num:8" },
+        { text: "9️⃣", callback_data: "num:9" }
       ],
       [
-        { text: "🔙 بازگشت به منو", callback_data: "action:grid" }
+        { text: "🔙 بازگشت به جدول", callback_data: "action:grid" }
       ]
     ]
   };
