@@ -75,24 +75,31 @@ export function buildBoxCellsKeyboard(board, boxIndex) {
   return { inline_keyboard: keyboard };
 }
 
-export function buildNumberKeyboard(boxIndex, cellIndex) {
+export function buildNumberKeyboard(board, boxIndex, cellIndex) {
+  const counts = {};
+  for (let i = 1; i <= 9; i++) {
+    counts[i] = 9;
+  }
+  for (let i = 0; i < 81; i++) {
+    const val = board[i];
+    if (val >= 1 && val <= 9) {
+      counts[val]--;
+    }
+  }
+
+  const createNumButton = (num) => {
+    if (counts[num] <= 0) {
+      return { text: `☑️ ${num} (تکمیل)`, callback_data: `num_done:${num}` };
+    }
+    const icons = ['', '🟥 ۱', '🟧 ۲', '🟨 ۳', '🟩 ۴', '🟦 ۵', '🟪 ۶', '🟫 ۷', '⬛ ۸', '⬜ ۹'];
+    return { text: icons[num], callback_data: `num:${cellIndex}:${num}` };
+  };
+
   return {
     inline_keyboard: [
-      [
-        { text: '🟥 ۱', callback_data: `num:${cellIndex}:1` },
-        { text: '🟧 ۲', callback_data: `num:${cellIndex}:2` },
-        { text: '🟨 ۳', callback_data: `num:${cellIndex}:3` }
-      ],
-      [
-        { text: '🟩 ۴', callback_data: `num:${cellIndex}:4` },
-        { text: '🟦 ۵', callback_data: `num:${cellIndex}:5` },
-        { text: '🟪 ۶', callback_data: `num:${cellIndex}:6` }
-      ],
-      [
-        { text: '🟫 ۷', callback_data: `num:${cellIndex}:7` },
-        { text: '⬛ ۸', callback_data: `num:${cellIndex}:8` },
-        { text: '⬜ ۹', callback_data: `num:${cellIndex}:9` }
-      ],
+      [createNumButton(1), createNumButton(2), createNumButton(3)],
+      [createNumButton(4), createNumButton(5), createNumButton(6)],
+      [createNumButton(7), createNumButton(8), createNumButton(9)],
       [
         { text: '🧹 پاک کردن خانه', callback_data: `num:${cellIndex}:0` }
       ],
