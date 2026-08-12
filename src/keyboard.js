@@ -49,7 +49,8 @@ export function buildSudokuGridKeyboard(board) {
   return { inline_keyboard: keyboard };
 }
 
-export function buildBoxCellsKeyboard(board, boxIndex) {
+// اضافه شدن puzzle برای تشخیص خانه‌های اصلی
+export function buildBoxCellsKeyboard(board, puzzle, boxIndex) {
   let keyboard = [];
   const startRow = Math.floor(boxIndex / 3) * 3;
   const startCol = (boxIndex % 3) * 3;
@@ -61,8 +62,15 @@ export function buildBoxCellsKeyboard(board, boxIndex) {
       const cellCol = startCol + c;
       const cellIndex = cellRow * 9 + cellCol;
       const val = board[cellIndex];
+      const isOriginal = puzzle[cellIndex] !== 0;
 
-      let text = val !== 0 ? `🔒 ${val}` : `▫️ خالی`;
+      let text;
+      if (isOriginal) {
+        text = `🔒 ${val} (ثابت)`;
+      } else {
+        text = val !== 0 ? `✏️ ${val}` : `▫️ خالی`;
+      }
+
       rowButtons.push({ text: text, callback_data: `cell:${boxIndex}:${cellIndex}` });
     }
     keyboard.push(rowButtons);
@@ -104,14 +112,12 @@ export function buildNumberKeyboard(board, boxIndex, cellIndex, userScore = 0) {
     ]
   ];
 
-  // اگر کاربر حداقل ۵ امتیاز داشت، کلید راهنما اضافه شود
   if (userScore >= 5) {
     keyboard.push([
       { text: '💡 راهنما (-5 امتیاز)', callback_data: `hint:${cellIndex}` }
     ]);
   }
 
-  // اگر تعداد خانه‌های خالی کل جدول بین ۱ تا ۴ عدد بود، دکمه حل خودکار نمایش داده شود
   const emptyCellsCount = board.filter(v => v === 0).length;
   if (emptyCellsCount > 0 && emptyCellsCount <= 4) {
     keyboard.push([
