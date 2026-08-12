@@ -110,7 +110,6 @@ export function createBoardText(game, selectedCell = -1) {
     }
   }
   
-  // محاسبه درصد پیشرفت بر اساس خانه‌های پرشده
   const filledCount = board.filter(v => v !== 0).length;
   game.progress = Math.round((filledCount / 81) * 100);
 
@@ -157,31 +156,7 @@ export async function handleUpdate(update, env) {
 
     let game = activeGames.get(chatId);
 
-    if (data.startsWith('difficulty:') || data === 'action:new') {
-      const difficulty = data.startsWith('difficulty:') ? data.split(':')[1] : (game?.difficulty || 'easy');
-      const template = SUDOKU_PUZZLES[difficulty] || SUDOKU_PUZZLES.easy;
-      
-      game = {
-        board: [...template.puzzle],
-        solution: [...template.solution],
-        difficulty: difficulty,
-        initial: [...template.puzzle],
-        errors: 0,
-        selectedRow: null
-      };
-      
-      activeGames.set(chatId, game);
-
-      await callTelegram(token, 'editMessageText', {
-        chat_id: chatId,
-        message_id: messageId,
-        text: createBoardText(game),
-        parse_mode: 'HTML',
-        reply_markup: buildSudokuGridKeyboard(game.board)
-      });
-      return new Response('OK', { status: 200 });
-    }
-
+    // اگر بازی وجود نداشت، یک بازی پیش‌فرض بسازیم تا ارور ندهد
     if (!game) {
       const template = SUDOKU_PUZZLES.easy;
       game = {
@@ -195,9 +170,33 @@ export async function handleUpdate(update, env) {
       activeGames.set(chatId, game);
     }
 
+    if (data.startsWith('difficulty:') || data === 'action:new') {
+      const difficulty = data.startsWith('difficulty:') ? data.split(':')[1] : (game?.difficulty || 'easy');
+      const template = SUDOKU_PUZZLES[difficulty] || SUDOKU_PUZZLES.easy;
+      
+      game.board = [...template.puzzle];
+      game.solution = [...template.solution];
+      game.difficulty = difficulty;
+      game.initial = [...template.puzzle];
+      game.errors = 0;
+      game.selectedRow = null;
+      
+      activeGames.set(chatId, game);
+
+      await callTelegram(token, 'editMessageText', {
+        chat_id: chatId,
+        message_id: messageId,
+        text: createBoardText(game),
+        parse_mode: 'HTML',
+        reply_markup: buildSudokuGridKeyboard(game.board)
+      });
+      return new Response('OK', { status: 200 });
+    }
+
     if (data.startsWith('row:')) {
       const rowIndex = parseInt(data.split(':')[1], 10);
       game.selectedRow = rowIndex;
+      activeGames.set(chatId, game);
 
       await callTelegram(token, 'editMessageText', {
         chat_id: chatId,
@@ -206,13 +205,13 @@ export async function handleUpdate(update, env) {
         parse_mode: 'HTML',
         reply_markup: buildNumberKeyboard(game)
       });
+      return new Response('OK', { status: 200 });
     }
 
     if (data.startsWith('num:')) {
       const num = parseInt(data.split(':')[1], 10);
       
       if (game.selectedRow !== null && game.selectedRow !== undefined) {
-        // پیدا کردن اولین خانه‌ی خالی (یا صفر) در آن سطر
         let targetCol = -1;
         for (let c = 0; c < 9; c++) {
           const idx = game.selectedRow * 9 + c;
@@ -224,7 +223,6 @@ export async function handleUpdate(update, env) {
 
         if (targetCol !== -1) {
           const targetIdx = game.selectedRow * 9 + targetCol;
-          // بررسی صحت عدد با پاسخنامه
           if (game.solution[targetIdx] === num) {
             game.board[targetIdx] = num;
           } else {
@@ -233,7 +231,6 @@ export async function handleUpdate(update, env) {
         }
       }
 
-      // چک کردن اتمام بازی
       const isFinished = game.board.every((val, idx) => val === game.solution[idx]);
 
       if (isFinished) {
@@ -253,10 +250,13 @@ export async function handleUpdate(update, env) {
           reply_markup: buildSudokuGridKeyboard(game.board)
         });
       }
+      return new Response('OK', { status: 200 });
     }
 
     if (data === 'action:grid') {
       game.selectedRow = null;
+      activeGames.set(chatId, game);
+
       await callTelegram(token, 'editMessageText', {
         chat_id: chatId,
         message_id: messageId,
@@ -264,8 +264,9 @@ export async function handleUpdate(update, env) {
         parse_mode: 'HTML',
         reply_markup: buildSudokuGridKeyboard(game.board)
       });
+      return new Response('OK', { status: 200 });
     }
   }
 
   return new Response('OK', { status: 200 });
-      }
+        }
