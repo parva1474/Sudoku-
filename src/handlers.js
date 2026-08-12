@@ -10,7 +10,6 @@ const activeGames = new Map();
 
 const BOX_COLORS = ["🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "🟫", "⬛", "⬜"];
 
-// ۹ رنگ کاملاً مجزا برای ۹ بلوک جدول ۳در۳
 const BOX_COLORS_BG = [
   "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨",
   "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨",
@@ -116,11 +115,11 @@ export function createBoardText(game, highlightCell = -1) {
       } else if (val !== 0) {
         gridStr += ` ${val} `;
       } else {
-        gridStr += colorIcon;
+        gridStr += colorIcon + " ";
       }
       
       if ((col + 1) % 3 === 0 && col < 8) {
-        gridStr += " |";
+        gridStr += "|";
       } else {
         gridStr += " ";
       }
@@ -128,7 +127,7 @@ export function createBoardText(game, highlightCell = -1) {
     gridStr += "\n";
     
     if ((row + 1) % 3 === 0 && row < 8) {
-      gridStr += "------------------------\n";
+      gridStr += "---------------------------------\n";
     }
   }
   
@@ -292,4 +291,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-      }
+}
