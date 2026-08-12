@@ -796,22 +796,19 @@ async function handleCallbackQuery(
     );
 
 
-    const png =
-      await renderSudokuPNG(
-        game
-      );
+      const png = await renderSudokuPNG(game);
+    
+  const pngBlob = new Blob([png], { type: 'image/png' });
 
-    const pngBlob = new Blob([png], { type: 'image/png' });
-
-
-    await editMessagePhoto(
-      token,
-      message.chat.id,
-      message.message_id,
-      pngBlob,
-      createNumberScreenText(game),
-      buildNumberKeyboard(game)
-    );
+  await editMessageMedia(
+    token,
+    message.chat.id,
+    message.message_id,
+    pngBlob,
+    createBoardCaption(game), // یا متون مربوط به انتخاب عدد
+    buildBlockKeyboard(game)  // یا کیبورد مربوطه
+  );
+    
 
     return;
   }
