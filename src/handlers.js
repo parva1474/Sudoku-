@@ -15,11 +15,13 @@ const globalScores = {};
 
 export function createBoardText(game, highlightCell = -1) {
   const board = game.board || Array(81).fill(0);
+  const isFinished = board.every((val, idx) => val === game.solution[idx]);
 
   const filledCount = board.filter(v => v !== 0).length;
   game.progress = Math.round((filledCount / 81) * 100);
 
-  let gridStr = `🧩 <b>سودوکو چندنفره آنلاین</b>\n👤 بازیکن: ${game.playerNames[game.turnUserId] || 'بازیکن'}\n\n<code>`;
+  let statusEmoji = isFinished ? "✅" : "🧩";
+  let gridStr = `${statusEmoji} <b>سودوکو چندنفره آنلاین</b>\n👤 بازیکن: ${game.playerNames[game.turnUserId] || 'بازیکن'}\n\n<code>`;
 
   for (let row = 0; row < 9; row++) {
     for (let col = 0; col < 9; col++) {
@@ -44,6 +46,10 @@ export function createBoardText(game, highlightCell = -1) {
     }
   }
   gridStr += `</code>`;
+
+  if (isFinished) {
+    gridStr += "\n\n🎉 <b>تبریک! این جدول کاملاً حل شد.</b>";
+  }
 
   const counts = {};
   for (let i = 1; i <= 9; i++) {
@@ -100,7 +106,7 @@ async function callTelegram(token, method, payload) {
 
 export async function handleUpdate(update, env) {
   const token = env.BOT_TOKEN;
-  const kv = env.SUDOKU_KV; // پایگاه داده ابری کلادفلر
+  const kv = env.SUDOKU_KV;
 
   if (update.message) {
     const msg = update.message;
@@ -181,7 +187,7 @@ export async function handleUpdate(update, env) {
       game.playerNames[userId] = userName;
       game.turnUserId = userId;
 
-      if (kv) await kv.put(gameKey, JSON.stringify(game), { expirationTtl: 86400 }); // ذخیره برای ۲۴ ساعت
+      if (kv) await kv.put(gameKey, JSON.stringify(game), { expirationTtl: 86400 });
 
       const payload = {
         text: createBoardText(game, -1) + "\n\n👇 <b>یک بلوک انتخاب کنید:</b>",
@@ -256,6 +262,72 @@ export async function handleUpdate(update, env) {
       editPayload.inline_message_id = inlineMessageId;
     }
 
+    if (data === 'solve_last_four') {
+      const emptyCount = game.board.filter(v => v === 0).length;
+      if (emptyCount > 0 && emptyCount <= 4) {
+        for (let i = 0; i < 81; i++) {
+          if (game.board[i] === 0) {
+            game.board[i] = game.solution[i];
+          }
+        }
+        let sortedScores = Object.entries(game.scores).sort((a, b) => b[1] - a[1]);
+        let scoresText = sortedScores
+          .map(([id, score], index) => {
+            const medal = index === 0 ? '👑 برنده:' : `👤`;
+            return `${medal} ${game.playerNames[id]}: امتیاز این بازی: ${score} | امتیاز کل: ${globalScores[id]}`;
+          })
+          .join('\n');
+
+        editPayload.text = createBoardText(game, -1) + `\n\n⚡ <b>چهار عدد آخر حل شد و جدول کامل گردید!</b>\n\n${scoresText}`;
+        editPayload.reply_markup = buildFinishedKeyboard();
+
+        if (kv) await kv.put(gameKey, JSON.stringify(game), { expirationTtl: 86400 });
+        await callTelegram(token, 'editMessageText', editPayload);
+      }
+      return new Response('OK', { status: 200 });
+    }
+
+    if (data.startsWith('hint:')) {
+      const parts = data.split(':');
+      const cellIndex = parseInt(parts[1], 10);
+      const userScore = game.scores[userId] || 0;
+
+      if (userScore >= 5) {
+        game.scores[userId] -= 5;
+        globalScores[userId] = Math.max(0, (globalScores[userId] || 0) - 5);
+        game.board[cellIndex] = game.solution[cellIndex];
+
+        const boxIndex = Math.floor(cellIndex / 27) * 3 + Math.floor((cellIndex % 9) / 3);
+        const isFinished = game.board.every((val, idx) => val === game.solution[idx]);
+
+        if (isFinished) {
+          let sortedScores = Object.entries(game.scores).sort((a, b) => b[1] - a[1]);
+          let scoresText = sortedScores
+            .map(([id, score], index) => {
+              const medal = index === 0 ? '👑 برنده:' : `👤`;
+              return `${medal} ${game.playerNames[id]}: امتیاز این بازی: ${score} | امتیاز کل: ${globalScores[id]}`;
+            })
+            .join('\n');
+
+          editPayload.text = createBoardText(game, -1) + `\n\n🏆 <b>بازی به پایان رسید و جدول کامل شد!</b>\n\n${scoresText}`;
+          editPayload.reply_markup = buildFinishedKeyboard();
+        } else {
+          editPayload.text = createBoardText(game, cellIndex) + `\n\n💡 <b>راهنما استفاده شد (-5 امتیاز). عدد درست قرار گرفت!</b>\n\n👇 <b>عدد را انتخاب کنید:</b>`;
+          editPayload.reply_markup = buildNumberKeyboard(game.board, boxIndex, cellIndex, game.scores[userId]);
+        }
+
+        if (kv) await kv.put(gameKey, JSON.stringify(game), { expirationTtl: 86400 });
+        await callTelegram(token, 'editMessageText', editPayload);
+      } else {
+        await callTelegram(token, 'answerCallbackQuery', {
+          callback_query_id: query.id,
+          text: 'امتیاز شما برای استفاده از راهنما کافی نیست (حداقل ۵ امتیاز لازم است).',
+          show_alert: true
+        });
+      }
+      return new Response('OK', { status: 200 });
+    }
+
     if (data.startsWith('box_done:')) {
       await callTelegram(token, 'answerCallbackQuery', {
         callback_query_id: query.id,
@@ -301,8 +373,9 @@ export async function handleUpdate(update, env) {
       game.activeBox = boxIndex;
       game.activeCell = cellIndex;
 
+      const userScore = game.scores[userId] || 0;
       editPayload.text = createBoardText(game, cellIndex) + `\n\n👇 <b>عدد را انتخاب کنید:</b>`;
-      editPayload.reply_markup = buildNumberKeyboard(game.board, boxIndex, cellIndex);
+      editPayload.reply_markup = buildNumberKeyboard(game.board, boxIndex, cellIndex, userScore);
 
       if (kv) await kv.put(gameKey, JSON.stringify(game), { expirationTtl: 86400 });
       await callTelegram(token, 'editMessageText', editPayload);
@@ -385,4 +458,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-  }
+        }
