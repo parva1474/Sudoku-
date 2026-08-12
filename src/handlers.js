@@ -40,7 +40,6 @@ export function createBoardText(game, selectedCell = -1) {
   return gridStr;
 }
 
-// تابع کمکی برای ارسال درخواست به تلگرام
 async function callTelegram(token, method, payload) {
   const url = `https://api.telegram.org/bot${token}/${method}`;
   const response = await fetch(url, {
@@ -51,9 +50,9 @@ async function callTelegram(token, method, payload) {
   return await response.json();
 }
 
-export async function handleUpdate(request, env) {
-  const update = await request.json();
-  const token = env.BOT_TOKEN; // توکن ربات از متغیرهای محیطی
+// ورودی این تابع باید خودِ شیء update باشد که از request.json() در فایل اصلی worker.js به دست آمده
+export async function handleUpdate(update, env) {
+  const token = env.BOT_TOKEN;
 
   if (update.message) {
     const msg = update.message;
@@ -72,6 +71,10 @@ export async function handleUpdate(request, env) {
     const data = query.data;
     const chatId = query.message.chat.id;
     const messageId = query.message.message_id;
+
+    await callTelegram(token, 'answerCallbackQuery', {
+      callback_query_id: query.id
+    });
 
     const dummyGame = {
       board: Array(81).fill(0),
