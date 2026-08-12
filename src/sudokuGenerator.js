@@ -2,38 +2,81 @@
 // src/sudokuGenerator.js
 // ==========================================
 
-const BASE_PUZZLES = {
-  easy: [
-    {
-      puzzle: [5,3,0, 0,7,0, 0,0,0, 6,0,0, 1,9,5, 0,0,0, 0,9,8, 0,0,0, 0,6,0, 8,0,0, 0,6,0, 0,0,3, 4,0,0, 8,0,3, 0,0,1, 7,0,0, 0,2,0, 0,0,6, 0,6,0, 0,0,0, 2,8,0, 0,0,0, 4,1,9, 0,0,5, 0,0,0, 0,8,0, 0,7,9],
-      solution: [5,3,4, 6,7,8, 9,1,2, 6,7,2, 1,9,5, 3,4,8, 1,9,8, 3,4,2, 5,6,7, 8,5,9, 7,6,1, 4,2,3, 4,2,6, 8,5,3, 7,9,1, 7,1,3, 9,2,4, 8,5,6, 9,6,1, 5,3,7, 2,8,4, 2,8,7, 4,1,9, 6,3,5, 3,4,5, 2,8,6, 1,7,9]
+// تابع کمکی برای بررسی امکان قرار دادن عدد در خانه
+function isValid(board, row, col, num) {
+  for (let i = 0; i < 9; i++) {
+    if (board[row * 9 + i] === num && i !== col) return false;
+    if (board[i * 9 + col] === num && i !== row) return false;
+  }
+  const startRow = Math.floor(row / 3) * 3;
+  const startCol = Math.floor(col / 3) * 3;
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      const currRow = startRow + r;
+      const currCol = startCol + c;
+      if (board[currRow * 9 + currCol] === num && (currRow !== row || currCol !== col)) {
+        return false;
+      }
     }
-  ],
-  medium: [
-    {
-      puzzle: [0,0,0, 2,6,0, 7,0,1, 6,8,0, 0,7,0, 0,9,0, 1,9,0, 0,0,4, 5,0,0, 8,2,0, 1,0,0, 0,4,0, 0,0,4, 6,0,2, 9,0,0, 0,5,0, 0,0,3, 0,2,8, 0,0,9, 3,0,0, 0,7,4, 0,4,0, 0,5,0, 0,3,6, 7,0,3, 0,1,8, 0,0,0],
-      solution: [4,3,5, 2,6,9, 7,8,1, 6,8,2, 5,7,1, 4,9,3, 1,9,7, 8,3,4, 5,6,2, 8,2,6, 1,9,5, 3,4,7, 3,7,4, 6,8,2, 9,1,5, 9,5,1, 7,4,3, 6,2,8, 5,1,9, 3,2,6, 8,7,4, 2,4,8, 9,5,7, 1,3,6, 7,6,3, 4,1,8, 2,5,9]
-    }
-  ],
-  hard: [
-    {
-      puzzle: [0,2,0, 0,0,0, 0,0,0, 0,0,0, 6,0,0, 0,0,3, 0,7,4, 0,8,0, 0,0,0, 0,0,0, 0,0,3, 0,2,0, 0,8,0, 0,4,0, 0,1,0, 0,1,0, 9,0,0, 0,0,0, 0,0,0, 0,2,0, 4,8,0, 0,0,0, 0,0,8, 0,0,7, 0,0,0, 0,0,0, 0,3,0],
-      solution: [1,2,6,4,3,7,9,5,8, 8,9,5,6,1,2,7,4,3, 3,7,4,5,8,9,1,6,2, 9,5,7,1,6,3,8,2,4, 2,8,3,7,4,5,6,1,9, 4,1,1,9,2,6,3,7,5, 7,3,9,3,2,1,4,8,6, 5,6,2,8,9,8,5,9,7, 6,4,8,2,7,4,2,3,1]
-    }
-  ]
-};
+  }
+  return true;
+}
 
-// تابع تولید عدد تصادفی برای انتخاب از بین ۱۰۰۰ جدول پویا بدون تکرار
+// حل‌کننده سودوکو برای ساخت جدول کامل
+function solveSudoku(board) {
+  for (let i = 0; i < 81; i++) {
+    if (board[i] === 0) {
+      const row = Math.floor(i / 9);
+      const col = i % 9;
+      const numbers = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      
+      for (let num of numbers) {
+        if (isValid(board, row, col, num)) {
+          board[i] = num;
+          if (solveSudoku(board)) return true;
+          board[i] = 0;
+        }
+      }
+      return false;
+    }
+  }
+  return true;
+}
+
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+// تولیدکننده اصلی جدول‌های پویا (بیش از ۵۰۰ ترکیب و جدول منحصر‌به‌فرد برای هر سطح)
 export function generateSudoku(difficulty) {
-  const pool = BASE_PUZZLES[difficulty] || BASE_PUZZLES.easy;
-  // شبیه‌سازی دسترسی به مجموعه ۱۰۰۰ تایی با تغییرات اندک ساختاری برای تنوع
-  const randomIndex = Math.floor(Math.random() * 1000);
-  const base = pool[0];
+  // ساخت جدول حل‌شده کامل پایه
+  let solution = Array(81).fill(0);
+  solveSudoku(solution);
+
+  let puzzle = [...solution];
   
-  // برای پشتیبانی از ۱۰۰۰ جدول متنوع، پایه اصلی را بازگردانده یا در صورت نیاز تغییر می‌دهیم
+  // تعیین تعداد خانه‌هایی که بر اساس درجه سختی باید حذف شوند
+  let removeCount = 35; // آسان
+  if (difficulty === 'medium') removeCount = 45;
+  if (difficulty === 'hard') removeCount = 52;
+  if (difficulty === 'expert') removeCount = 58;
+
+  let removed = 0;
+  while (removed < removeCount) {
+    const index = Math.floor(Math.random() * 81);
+    if (puzzle[index] !== 0) {
+      puzzle[index] = 0;
+      removed++;
+    }
+  }
+
   return {
-    id: `${difficulty}_${randomIndex}`,
-    puzzle: [...base.puzzle],
-    solution: [...base.solution]
+    id: `${difficulty}_${Math.floor(Math.random() * 500) + 1}_${Date.now()}`,
+    puzzle: puzzle,
+    solution: solution
   };
 }
