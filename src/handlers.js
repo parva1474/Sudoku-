@@ -61,6 +61,26 @@ const VALID_DIFFICULTIES = [
 // پردازش Update
 // ==========================================
 
+async function handleCallbackQuery(
+  callback,
+  env,
+  token
+) {
+
+  const callbackId =
+    callback.id;
+
+  const message =
+    callback.message;
+
+  // 👇 همینجا در ابتدای تابع، این خط را اضافه کنید تا بلافاصله به تلگرام پاسخ داده شود
+  await answerCallbackQuery(token, callbackId).catch(() => {});
+
+  if (!message) {
+    return;
+  }
+  // ... ادامه کدها
+  
 export async function handleUpdate(
   update,
   env,
