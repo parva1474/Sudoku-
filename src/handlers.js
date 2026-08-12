@@ -1525,5 +1525,5 @@ function safeJSON(
     ) {
 
       return fallback;
-    }
+  }
   }
