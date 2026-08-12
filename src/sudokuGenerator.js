@@ -2,7 +2,6 @@
 // src/sudokuGenerator.js
 // ==========================================
 
-// تابع کمکی برای بررسی امکان قرار دادن عدد در خانه
 function isValid(board, row, col, num) {
   for (let i = 0; i < 9; i++) {
     if (board[row * 9 + i] === num && i !== col) return false;
@@ -22,15 +21,12 @@ function isValid(board, row, col, num) {
   return true;
 }
 
-// حل‌کننده سودوکو برای ساخت جدول کامل
 function solveSudoku(board) {
   for (let i = 0; i < 81; i++) {
     if (board[i] === 0) {
       const row = Math.floor(i / 9);
       const col = i % 9;
-      const numbers = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-      
-      for (let num of numbers) {
+      for (let num = 1; num <= 9; num++) {
         if (isValid(board, row, col, num)) {
           board[i] = num;
           if (solveSudoku(board)) return true;
@@ -51,26 +47,34 @@ function shuffle(array) {
   return array;
 }
 
-// تولیدکننده اصلی جدول‌های پویا (بیش از ۵۰۰ ترکیب و جدول منحصر‌به‌فرد برای هر سطح)
 export function generateSudoku(difficulty) {
-  // ساخت جدول حل‌شده کامل پایه
   let solution = Array(81).fill(0);
   solveSudoku(solution);
 
   let puzzle = [...solution];
   
-  // تعیین تعداد خانه‌هایی که بر اساس درجه سختی باید حذف شوند
+  // تعداد خانه‌هایی که باید برداشته شوند
   let removeCount = 35; // آسان
   if (difficulty === 'medium') removeCount = 45;
   if (difficulty === 'hard') removeCount = 52;
   if (difficulty === 'expert') removeCount = 58;
 
-  let removed = 0;
-  while (removed < removeCount) {
-    const index = Math.floor(Math.random() * 81);
-    if (puzzle[index] !== 0) {
-      puzzle[index] = 0;
-      removed++;
+  let attempts = removeCount;
+  let indices = shuffle([...Array(81).keys()]);
+
+  for (let i = 0; i < indices.length && attempts > 0; i++) {
+    let idx = indices[i];
+    if (puzzle[idx] !== 0) {
+      let temp = puzzle[idx];
+      puzzle[idx] = 0;
+      
+      // بررسی اینکه آیا جدول همچنان قابل حل است
+      let copy = [...puzzle];
+      if (!solveSudoku(copy)) {
+        puzzle[idx] = temp; // اگر قابل حل نبود، برگردان
+      } else {
+        attempts--;
+      }
     }
   }
 
