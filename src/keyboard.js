@@ -1,39 +1,35 @@
 // ==========================================
-// src/keyboard.js (3-Column Blocks per Row for 9x9 Grid)
+// src/keyboard.js - نسخه ۹ بلوک ۳در۳
 // ==========================================
 
+// نمایش نمای کلی جدول (۹ بلوک ۳ در ۳)
 export function buildSudokuGridKeyboard(board, selectedCell = -1) {
   const keyboard = [];
 
-  for (let row = 0; row < 9; row++) {
+  for (let blockRow = 0; blockRow < 3; blockRow++) {
     const rowButtons = [];
 
     for (let blockCol = 0; blockCol < 3; blockCol++) {
-      let blockText = "";
-      const startCol = blockCol * 3;
-
-      for (let i = 0; i < 3; i++) {
-        const col = startCol + i;
-        const index = (row * 9) + col;
-        const val = board[index];
-        
-        let char = val ? String(val) : "·";
-        if (index === selectedCell) {
-          char = `[${char}]`;
+      // تولید محتوای نمایشی کوچک برای هر بلوک ۳در۳
+      let display = "";
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) {
+          const idx = ((blockRow * 3 + r) * 9) + (blockCol * 3 + c);
+          display += (board[idx] ? board[idx] : "·");
+          if (c < 2) display += " ";
         }
-        
-        blockText += (i === 0 ? "" : " ") + char;
+        if (r < 2) display += "\n";
       }
 
       rowButtons.push({
-        text: blockText,
-        callback_data: `cell:${row * 9 + startCol}`
+        text: display,
+        callback_data: `block:${blockRow}_${blockCol}`
       });
     }
-
     keyboard.push(rowButtons);
   }
 
+  // دکمه‌های کنترلی پایین
   keyboard.push([
     { text: "✏️ مداد", callback_data: "mode:pencil" },
     { text: "🧹 پاک کردن", callback_data: "mode:erase" },
@@ -47,6 +43,7 @@ export function buildSudokuGridKeyboard(board, selectedCell = -1) {
   return { inline_keyboard: keyboard };
 }
 
+// کیبورد اعداد (برای وقتی که کاربر وارد یک بلوک شد)
 export function buildNumberKeyboard(game) {
   return {
     inline_keyboard: [
@@ -66,12 +63,13 @@ export function buildNumberKeyboard(game) {
         { text: "9️⃣", callback_data: "num:9" }
       ],
       [
-        { text: "🔙 بازگشت", callback_data: "action:grid" }
+        { text: "🔙 بازگشت به جدول اصلی", callback_data: "action:grid" }
       ]
     ]
   };
 }
 
+// کیبورد انتخاب سختی
 export function buildDifficultyKeyboard() {
   return {
     inline_keyboard: [
@@ -84,11 +82,12 @@ export function buildDifficultyKeyboard() {
   };
 }
 
+// کیبورد پایان بازی
 export function buildFinishedKeyboard() {
   return {
     inline_keyboard: [
       [
-        { text: "🏆 بازی تمام شد - شروع مجدد", callback_data: "action:new" }
+        { text: "🏆 تبریک! شروع مجدد", callback_data: "action:new" }
       ]
     ]
   };
