@@ -5,10 +5,8 @@ import {
   buildFinishedKeyboard 
 } from './keyboard.js';
 
-// ذخیره وضعیت بازی‌ها در حافظه
 const activeGames = new Map();
 
-// پازل‌های استاندارد سودوکو واقعی برای سطوح مختلف
 const SUDOKU_PUZZLES = {
   easy: {
     puzzle: [
@@ -112,10 +110,11 @@ export function createBoardText(game, selectedCell = -1) {
     }
   }
   
-  const progress = game.progress !== undefined ? game.progress : 0;
-  const errors = game.errors !== undefined ? game.errors : 0;
+  // محاسبه درصد پیشرفت بر اساس خانه‌های پرشده
+  const filledCount = board.filter(v => v !== 0).length;
+  game.progress = Math.round((filledCount / 81) * 100);
 
-  gridStr += "</code>\n\n📊 <b>پیشرفت:</b> " + progress + "% | ❌ <b>اشتباه:</b> " + errors;
+  gridStr += "</code>\n\n📊 <b>پیشرفت:</b> " + game.progress + "% | ❌ <b>اشتباه:</b> " + (game.errors || 0);
   gridStr += "\n\n👇 روی سطر مورد نظر کلیک کنید:";
   
   return gridStr;
@@ -166,8 +165,9 @@ export async function handleUpdate(update, env) {
         board: [...template.puzzle],
         solution: [...template.solution],
         difficulty: difficulty,
-        progress: 0,
-        errors: 0
+        initial: [...template.puzzle],
+        errors: 0,
+        selectedRow: null
       };
       
       activeGames.set(chatId, game);
@@ -188,8 +188,9 @@ export async function handleUpdate(update, env) {
         board: [...template.puzzle],
         solution: [...template.solution],
         difficulty: 'easy',
-        progress: 0,
-        errors: 0
+        initial: [...template.puzzle],
+        errors: 0,
+        selectedRow: null
       };
       activeGames.set(chatId, game);
     }
@@ -207,7 +208,55 @@ export async function handleUpdate(update, env) {
       });
     }
 
+    if (data.startsWith('num:')) {
+      const num = parseInt(data.split(':')[1], 10);
+      
+      if (game.selectedRow !== null && game.selectedRow !== undefined) {
+        // پیدا کردن اولین خانه‌ی خالی (یا صفر) در آن سطر
+        let targetCol = -1;
+        for (let c = 0; c < 9; c++) {
+          const idx = game.selectedRow * 9 + c;
+          if (game.board[idx] === 0) {
+            targetCol = c;
+            break;
+          }
+        }
+
+        if (targetCol !== -1) {
+          const targetIdx = game.selectedRow * 9 + targetCol;
+          // بررسی صحت عدد با پاسخنامه
+          if (game.solution[targetIdx] === num) {
+            game.board[targetIdx] = num;
+          } else {
+            game.errors = (game.errors || 0) + 1;
+          }
+        }
+      }
+
+      // چک کردن اتمام بازی
+      const isFinished = game.board.every((val, idx) => val === game.solution[idx]);
+
+      if (isFinished) {
+        await callTelegram(token, 'editMessageText', {
+          chat_id: chatId,
+          message_id: messageId,
+          text: createBoardText(game) + `\n\n🏆 تبریک! شما جدول را با موفقیت حل کردید!`,
+          parse_mode: 'HTML',
+          reply_markup: buildFinishedKeyboard()
+        });
+      } else {
+        await callTelegram(token, 'editMessageText', {
+          chat_id: chatId,
+          message_id: messageId,
+          text: createBoardText(game),
+          parse_mode: 'HTML',
+          reply_markup: buildSudokuGridKeyboard(game.board)
+        });
+      }
+    }
+
     if (data === 'action:grid') {
+      game.selectedRow = null;
       await callTelegram(token, 'editMessageText', {
         chat_id: chatId,
         message_id: messageId,
@@ -219,4 +268,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-        }
+      }
