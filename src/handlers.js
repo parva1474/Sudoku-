@@ -24,11 +24,11 @@ export function createBoardText(game, highlightCell = -1) {
       const val = board[idx];
       
       if (idx === highlightCell) {
-        gridStr += `[${val !== 0 ? val : '·'}]`;
+        gridStr += `[${val !== 0 ? val : '.'}]`;
       } else if (val !== 0) {
         gridStr += ` ${val} `;
       } else {
-        gridStr += ` ⚪ `;
+        gridStr += ` . `;
       }
       
       if ((col + 1) % 3 === 0 && col < 8) {
@@ -40,7 +40,7 @@ export function createBoardText(game, highlightCell = -1) {
     gridStr += "\n";
     
     if ((row + 1) % 3 === 0 && row < 8) {
-      gridStr += "-------+-------+-------\n";
+      gridStr += "---+---+---\n";
     }
   }
   
@@ -302,4 +302,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-}
+        }
