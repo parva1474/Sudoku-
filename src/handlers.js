@@ -12,11 +12,12 @@ import {
 import { generateSudoku } from './sudokuGenerator.js';
 
 const activeGames = new Map();
+// ذخیره امتیازات کل کاربران در تمام بازی‌ها
+const globalScores = {};
 
 export function createBoardText(game, highlightCell = -1) {
   const board = game.board || Array(81).fill(0);
 
-  // محاسبه دقیق درصد پیشرفت بر اساس خانه‌های پرشده
   const filledCount = board.filter(v => v !== 0).length;
   game.progress = Math.round((filledCount / 81) * 100);
 
@@ -48,7 +49,6 @@ export function createBoardText(game, highlightCell = -1) {
     }
   }
 
-  // محاسبه تعداد باقیمانده هر عدد
   const counts = {};
   for (let i = 1; i <= 9; i++) {
     counts[i] = 9;
@@ -71,7 +71,14 @@ export function createBoardText(game, highlightCell = -1) {
   }
   remainingText += line1.join(' | ') + "\n" + line2.join(' | ');
 
-  gridStr += `</code>\n${remainingText}\n\n📊 <b>پیشرفت:</b> ${game.progress}% | ⭐ <b>امتیاز:</b> ${game.scores[game.turnUserId] || 0} | ❌ <b>خطا:</b> ${game.errors[game.turnUserId] || 0}/4`;
+  // نمایش امتیاز کل همه بازیکنان ثبت‌شده در این بازی
+  let scoresSummary = "\n⭐ <b>امتیازات کل:</b>\n";
+  for (let pId in game.playerNames) {
+    const totalScore = globalScores[pId] || 0;
+    scoresSummary += `👤 ${game.playerNames[pId]}: ${totalScore} امتیاز\n`;
+  }
+
+  gridStr += `</code>\n${remainingText}\n${scoresSummary}\n📊 <b>پیشرفت:</b> ${game.progress}% | ❌ <b>خطا:</b> ${game.errors[game.turnUserId] || 0}/4`;
   
   return gridStr;
 }
@@ -163,7 +170,42 @@ export async function handleUpdate(update, env) {
 
     if (data.startsWith('difficulty:') || data === 'action:new') {
       const difficulty = data.startsWith('difficulty:') ? data.split(':')[1] : (game?.difficulty || 'easy');
-      const newPuzzleObj = generateSudoku(difficulty);
+      
+      // جلوگیری از تکرار جدول با استفاده از لیست پازل‌های استفاده‌شده
+      let newPuzzleObj;
+      let attempts = 0;
+      do {
+        newPuzzleObj = generateSudoku(difficulty);
+        attempts++;
+      } while (game && game.usedPuzzles && game.usedPuzzles.has(newPuzzleObj.id) && attempts < 10);
+
+      const usedPuzzlesSet = game && game.usedPuzzles ? game.usedPuzzles : new Set();
+      usedPuzzlesSet.add(newPuzzleObj.id);
+
+      // اگر دکمه بازی مجدد زده شد، یک پیام جدید در پایین ارسال شود تا جدول قبلی باقی بماند
+      if (data === 'action:new' && chatId) {
+        game = {
+          board: [...newPuzzleObj.puzzle],
+          solution: [...newPuzzleObj.solution],
+          difficulty: difficulty,
+          scores: {},
+          errors: {},
+          banTimes: {},
+          playerNames: {},
+          usedPuzzles: usedPuzzlesSet
+        };
+        activeGames.set(gameKey, game);
+        game.playerNames[userId] = userName;
+        game.turnUserId = userId;
+
+        await callTelegram(token, 'sendMessage', {
+          chat_id: chatId,
+          text: createBoardText(game, -1) + "\n\n👇 <b>یک بلوک انتخاب کنید:</b>",
+          parse_mode: 'HTML',
+          reply_markup: buildSudokuGridKeyboard(game.board)
+        });
+        return new Response('OK', { status: 200 });
+      }
       
       game = {
         board: [...newPuzzleObj.puzzle],
@@ -173,7 +215,7 @@ export async function handleUpdate(update, env) {
         errors: {},
         banTimes: {},
         playerNames: {},
-        usedPuzzles: new Set([newPuzzleObj.id])
+        usedPuzzles: usedPuzzlesSet
       };
       
       activeGames.set(gameKey, game);
@@ -295,6 +337,7 @@ export async function handleUpdate(update, env) {
       const boxIndex = game.activeBox !== undefined ? game.activeBox : 0;
 
       if (!game.scores[userId]) game.scores[userId] = 0;
+      if (!globalScores[userId]) globalScores[userId] = 0;
       if (!game.errors[userId]) game.errors[userId] = 0;
 
       if (num === 0) {
@@ -303,9 +346,11 @@ export async function handleUpdate(update, env) {
         if (game.solution[cellIndex] === num) {
           game.board[cellIndex] = num;
           game.scores[userId] += 1;
+          globalScores[userId] += 1; // اضافه شدن به امتیاز کل
         } else {
           game.errors[userId] += 1;
           game.scores[userId] = Math.max(0, game.scores[userId] - 2);
+          globalScores[userId] = Math.max(0, globalScores[userId] - 2); // کسر از امتیاز کل در صورت خطا
         }
       }
 
@@ -332,7 +377,7 @@ export async function handleUpdate(update, env) {
         let scoresText = sortedScores
           .map(([id, score], index) => {
             const medal = index === 0 ? '👑 برنده:' : `👤`;
-            return `${medal} ${game.playerNames[id]}: ${score} امتیاز`;
+            return `${medal} ${game.playerNames[id]}: امتیاز این بازی: ${score} | امتیاز کل: ${globalScores[id]}`;
           })
           .join('\n');
 
@@ -357,4 +402,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-          }
+  }
