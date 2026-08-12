@@ -1,3 +1,7 @@
+// ==========================================
+// src/handlers.js
+// ==========================================
+
 import { 
   buildSudokuGridKeyboard, 
   buildBoxCellsKeyboard,
@@ -63,35 +67,6 @@ export function createBoardText(game, highlightCell = -1) {
   return gridStr;
 }
 
-// در تابع handleUpdate این بخش را اضافه کنید:
-
-  if (update.inline_query) {
-    const inlineQuery = update.inline_query;
-    const queryId = inlineQuery.id;
-    
-    // ساخت نتیجه اینلاین برای شروع بازی سودوکو
-    const results = [
-      {
-        type: 'article',
-        id: 'start_sudoku',
-        title: '🧩 شروع بازی سودوکو آنلاین',
-        description: 'کلیک کنید تا جدول سودوکو چندنفره ساخته شود',
-        input_message_content: {
-          message_text: '🧩 <b>سودوکو چندنفره آنلاین</b>\n\nلطفاً درجه سختی بازی را انتخاب کنید:',
-          parse_mode: 'HTML'
-        },
-        reply_markup: buildDifficultyKeyboard()
-      }
-    ];
-
-    await callTelegram(token, 'answerInlineQuery', {
-      inline_query_id: queryId,
-      results: results,
-      cache_time: 0
-    });
-
-    return new Response('OK', { status: 200 });
-  }
 async function callTelegram(token, method, payload) {
   const url = `https://api.telegram.org/bot${token}/${method}`;
   const response = await fetch(url, {
@@ -115,6 +90,33 @@ export async function handleUpdate(update, env) {
         reply_markup: buildDifficultyKeyboard()
       });
     }
+  }
+
+  if (update.inline_query) {
+    const inlineQuery = update.inline_query;
+    const queryId = inlineQuery.id;
+    
+    const results = [
+      {
+        type: 'article',
+        id: 'start_sudoku',
+        title: '🧩 شروع بازی سودوکو آنلاین',
+        description: 'کلیک کنید تا جدول سودوکو چندنفره ساخته شود',
+        input_message_content: {
+          message_text: '🧩 <b>سودوکو چندنفره آنلاین</b>\n\nلطفاً درجه سختی بازی را انتخاب کنید:',
+          parse_mode: 'HTML'
+        },
+        reply_markup: buildDifficultyKeyboard()
+      }
+    ];
+
+    await callTelegram(token, 'answerInlineQuery', {
+      inline_query_id: queryId,
+      results: results,
+      cache_time: 0
+    });
+
+    return new Response('OK', { status: 200 });
   }
 
   if (update.callback_query) {
@@ -287,4 +289,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-  }
+}
