@@ -5,9 +5,6 @@ import {
   buildFinishedKeyboard 
 } from './keyboard.js';
 
-// ==========================================
-// تابع ساخت متن گرافیکی جدول ۹ در ۹
-// ==========================================
 export function createBoardText(game, selectedCell = -1) {
   let gridStr = "🧩 <b>سودوکو آنلاین</b>\n\n<code>";
   
@@ -23,14 +20,12 @@ export function createBoardText(game, selectedCell = -1) {
         gridStr += ` ${char} `;
       }
       
-      // جداکننده عمودی بلوک‌های ۳تایی
       if ((col + 1) % 3 === 0 && col < 8) {
         gridStr += "|";
       }
     }
     gridStr += "\n";
     
-    // جداکننده افقی بلوک‌های ۳تایی
     if ((row + 1) % 3 === 0 && row < 8) {
       gridStr += "---------------------\n";
     }
@@ -45,20 +40,30 @@ export function createBoardText(game, selectedCell = -1) {
   return gridStr;
 }
 
-// ==========================================
-// مدیریت دستورات و Callback Queryها
-// ==========================================
-export async function handleUpdate(update, env) {
+// تابع کمکی برای ارسال درخواست به تلگرام
+async function callTelegram(token, method, payload) {
+  const url = `https://api.telegram.org/bot${token}/${method}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return await response.json();
+}
+
+export async function handleUpdate(request, env) {
+  const update = await request.json();
+  const token = env.BOT_TOKEN; // توکن ربات از متغیرهای محیطی
+
   if (update.message) {
     const msg = update.message;
     if (msg.text === '/start') {
-      return {
-        method: 'sendMessage',
+      await callTelegram(token, 'sendMessage', {
         chat_id: msg.chat.id,
         text: '🧩 <b>سودوکو آنلاین</b>\n\nلطفاً درجه سختی بازی را انتخاب کنید:',
         parse_mode: 'HTML',
         reply_markup: buildDifficultyKeyboard()
-      };
+      });
     }
   }
 
@@ -68,7 +73,6 @@ export async function handleUpdate(update, env) {
     const chatId = query.message.chat.id;
     const messageId = query.message.message_id;
 
-    // نمونه بازی فرضی برای رندر جدول
     const dummyGame = {
       board: Array(81).fill(0),
       progress: 0,
@@ -76,39 +80,36 @@ export async function handleUpdate(update, env) {
     };
 
     if (data.startsWith('difficulty:')) {
-      return {
-        method: 'editMessageText',
+      await callTelegram(token, 'editMessageText', {
         chat_id: chatId,
         message_id: messageId,
         text: createBoardText(dummyGame),
         parse_mode: 'HTML',
         reply_markup: buildSudokuGridKeyboard(dummyGame.board)
-      };
+      });
     }
 
     if (data.startsWith('row:')) {
       const rowIndex = parseInt(data.split(':')[1], 10);
-      return {
-        method: 'editMessageText',
+      await callTelegram(token, 'editMessageText', {
         chat_id: chatId,
         message_id: messageId,
         text: createBoardText(dummyGame) + `\n\n📍 سطر ${rowIndex + 1} انتخاب شد.`,
         parse_mode: 'HTML',
         reply_markup: buildNumberKeyboard(dummyGame)
-      };
+      });
     }
 
     if (data === 'action:grid' || data === 'action:new') {
-      return {
-        method: 'editMessageText',
+      await callTelegram(token, 'editMessageText', {
         chat_id: chatId,
         message_id: messageId,
         text: createBoardText(dummyGame),
         parse_mode: 'HTML',
         reply_markup: buildSudokuGridKeyboard(dummyGame.board)
-      };
+      });
     }
   }
 
-  return new Response('OK');
+  return new Response('OK', { status: 200 });
 }
