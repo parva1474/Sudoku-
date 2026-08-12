@@ -8,8 +8,9 @@ import {
 
 const activeGames = new Map();
 
-const BOX_COLORS = ["🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "🟥", "🟧", "🟨"];
+const BOX_COLORS = ["🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "🟫", "⬛", "⬜"];
 
+// ۹ رنگ کاملاً مجزا برای ۹ بلوک جدول ۳در۳
 const BOX_COLORS_BG = [
   "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨",
   "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨",
@@ -19,9 +20,9 @@ const BOX_COLORS_BG = [
   "🟩", "🟩", "🟩",  "🟦", "🟦", "🟦",  "🟪", "🟪", "🟪",
   "🟩", "🟩", "🟩",  "🟦", "🟦", "🟦",  "🟪", "🟪", "🟪",
 
-  "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨",
-  "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨",
-  "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨"
+  "🟫", "🟫", "🟫",  "⬛", "⬛", "⬛",  "⬜", "⬜", "⬜",
+  "🟫", "🟫", "🟫",  "⬛", "⬛", "⬛",  "⬜", "⬜", "⬜",
+  "🟫", "🟫", "🟫",  "⬛", "⬛", "⬛",  "⬜", "⬜", "⬜"
 ];
 
 const SUDOKU_PUZZLES = {
@@ -119,13 +120,15 @@ export function createBoardText(game, highlightCell = -1) {
       }
       
       if ((col + 1) % 3 === 0 && col < 8) {
-        gridStr += "|";
+        gridStr += " |";
+      } else {
+        gridStr += " ";
       }
     }
     gridStr += "\n";
     
     if ((row + 1) % 3 === 0 && row < 8) {
-      gridStr += "---------------------\n";
+      gridStr += "------------------------\n";
     }
   }
   
@@ -199,7 +202,7 @@ export async function handleUpdate(update, env) {
       await callTelegram(token, 'editMessageText', {
         chat_id: chatId,
         message_id: messageId,
-        text: createBoardText(game, -1) + "\n\n👇 <b>یک بلوک رنگی انتخاب کنید:</b>",
+        text: createBoardText(game, -1) + "\n\n👇 <b>یک بلوک انتخاب کنید:</b>",
         parse_mode: 'HTML',
         reply_markup: buildSudokuGridKeyboard(game.board)
       });
@@ -208,12 +211,11 @@ export async function handleUpdate(update, env) {
 
     if (data.startsWith('box:')) {
       const boxIndex = parseInt(data.split(':')[1], 10);
-      const colorIcon = BOX_COLORS[boxIndex];
 
       await callTelegram(token, 'editMessageText', {
         chat_id: chatId,
         message_id: messageId,
-        text: createBoardText(game, -1) + `\n\n${colorIcon} <b>بلوک ${boxIndex + 1} انتخاب شد.</b> خانه مورد نظر را انتخاب کنید:`,
+        text: createBoardText(game, -1) + `\n\n👇 <b>خانه مورد نظر را انتخاب کنید:</b>`,
         parse_mode: 'HTML',
         reply_markup: buildBoxCellsKeyboard(game.board, boxIndex)
       });
@@ -224,7 +226,6 @@ export async function handleUpdate(update, env) {
       const parts = data.split(':');
       const boxIndex = parseInt(parts[1], 10);
       const cellIndex = parseInt(parts[2], 10);
-      const colorIcon = BOX_COLORS[boxIndex];
 
       game.activeBox = boxIndex;
       game.activeCell = cellIndex;
@@ -232,7 +233,7 @@ export async function handleUpdate(update, env) {
       await callTelegram(token, 'editMessageText', {
         chat_id: chatId,
         message_id: messageId,
-        text: createBoardText(game, cellIndex) + `\n\n${colorIcon} <b>خانه انتخاب شد.</b> عدد مورد نظر را بزنید:`,
+        text: createBoardText(game, cellIndex) + `\n\n👇 <b>عدد را انتخاب کنید:</b>`,
         parse_mode: 'HTML',
         reply_markup: buildNumberKeyboard(boxIndex, cellIndex)
       });
@@ -245,7 +246,6 @@ export async function handleUpdate(update, env) {
       const num = parseInt(parts[2], 10);
       
       const boxIndex = game.activeBox !== undefined ? game.activeBox : 0;
-      const colorIcon = BOX_COLORS[boxIndex];
 
       if (num === 0) {
         game.board[cellIndex] = 0;
@@ -271,7 +271,7 @@ export async function handleUpdate(update, env) {
         await callTelegram(token, 'editMessageText', {
           chat_id: chatId,
           message_id: messageId,
-          text: createBoardText(game, -1) + `\n\n✅ ثبت شد. خانه دیگری از ${colorIcon} انتخاب کنید:`,
+          text: createBoardText(game, -1) + `\n\n👇 <b>خانه دیگری انتخاب کنید:</b>`,
           parse_mode: 'HTML',
           reply_markup: buildBoxCellsKeyboard(game.board, boxIndex)
         });
@@ -283,7 +283,7 @@ export async function handleUpdate(update, env) {
       await callTelegram(token, 'editMessageText', {
         chat_id: chatId,
         message_id: messageId,
-        text: createBoardText(game, -1) + "\n\n👇 <b>یک بلوک رنگی انتخاب کنید:</b>",
+        text: createBoardText(game, -1) + "\n\n👇 <b>یک بلوک انتخاب کنید:</b>",
         parse_mode: 'HTML',
         reply_markup: buildSudokuGridKeyboard(game.board)
       });
