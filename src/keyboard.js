@@ -64,7 +64,6 @@ export function buildBoxCellsKeyboard(board, boxIndex) {
 }
 
 export function buildNumberKeyboard(boxIndex, cellIndex) {
-  const colorIcon = BOX_COLORS[boxIndex];
   return {
     inline_keyboard: [
       [
