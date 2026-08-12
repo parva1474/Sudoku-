@@ -17,7 +17,6 @@ export function buildDifficultyKeyboard() {
   };
 }
 
-// بررسی کامل بودن بلوک
 function isBoxComplete(board, boxIndex) {
   const startRow = Math.floor(boxIndex / 3) * 3;
   const startCol = (boxIndex % 3) * 3;
@@ -39,7 +38,6 @@ export function buildSudokuGridKeyboard(board) {
       let boxIndex = bRow * 3 + bCol;
       
       if (isBoxComplete(board, boxIndex)) {
-        // اگر بلوک کامل شده باشد، به جای دکمه کلیک‌پذیر، متن تکمیل نمایش داده می‌شود
         rowButtons.push({ text: `✅ بلوک ${boxIndex + 1} (تکمیل)`, callback_data: `box_done:${boxIndex}` });
       } else {
         rowButtons.push({ text: `🟦 بلوک ${boxIndex + 1}`, callback_data: `box:${boxIndex}` });
@@ -47,10 +45,6 @@ export function buildSudokuGridKeyboard(board) {
     }
     keyboard.push(rowButtons);
   }
-
-  keyboard.push([
-    { text: '🔄 بازی جدید', callback_data: 'action:new' }
-  ]);
 
   return { inline_keyboard: keyboard };
 }
@@ -113,7 +107,7 @@ export function buildFinishedKeyboard() {
   return {
     inline_keyboard: [
       [
-        { text: '🔄 شروع بازی جدید', callback_data: 'action:new' }
+        { text: '🔄 بازی مجدد (جدول جدید)', callback_data: 'action:new' }
       ]
     ]
   };
