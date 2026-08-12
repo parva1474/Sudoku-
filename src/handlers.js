@@ -268,3 +268,35 @@ async function loadGame(env, chatId) {
 function safeJSON(val, fallback) {
   try { return JSON.parse(val); } catch { return fallback; }
 }
+export function createBoardText(game, selectedCell = -1) {
+  let gridStr = "🧩 <b>سودوکو آنلاین</b>\n\n<code>";
+  
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 9; col++) {
+      const idx = row * 9 + col;
+      const val = game.board[idx];
+      let char = val ? String(val) : "·";
+      
+      if (idx === selectedCell) {
+        gridStr += `[${char}]`;
+      } else {
+        gridStr += ` ${char} `;
+      }
+      
+      // خط جداکننده عمودی بین بلوک‌های ۳تایی
+      if ((col + 1) % 3 === 0 && col < 8) {
+        gridStr += "|";
+      }
+    }
+    gridStr += "\n";
+    
+    // خط جداکننده افقی بین بلوک‌های ۳تایی
+    if ((row + 1) % 3 === 0 && row < 8) {
+      gridStr += "---------------------\n";
+    }
+  }
+  
+  gridStr += "</code>\n\n📊 <b>پیشرفت:</b> " + (game.progress || "0%") + " | ❌ <b>اشتباه:</b> " + (game.errors || 0);
+  return gridStr;
+}
+}
