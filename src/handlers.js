@@ -137,7 +137,8 @@ export async function handleUpdate(update, env) {
       return new Response('OK', { status: 200 });
     }
 
-    let game = chatId ? activeGames.get(chatId) : activeGames.get(inlineMessageId);
+    const gameKey = chatId ? chatId : inlineMessageId;
+    let game = activeGames.get(gameKey);
 
     if (data.startsWith('difficulty:') || data === 'action:new') {
       const difficulty = data.startsWith('difficulty:') ? data.split(':')[1] : (game?.difficulty || 'easy');
@@ -154,8 +155,7 @@ export async function handleUpdate(update, env) {
         usedPuzzles: new Set([newPuzzleObj.id])
       };
       
-      if (chatId) activeGames.set(chatId, game);
-      else activeGames.set(inlineMessageId, game);
+      activeGames.set(gameKey, game);
 
       game.playerNames[userId] = userName;
       game.turnUserId = userId;
@@ -169,11 +169,11 @@ export async function handleUpdate(update, env) {
       if (chatId) {
         payload.chat_id = chatId;
         payload.message_id = messageId;
-        await callTelegram(token, 'editMessageText', payload);
       } else {
         payload.inline_message_id = inlineMessageId;
-        await callTelegram(token, 'editMessageText', payload);
       }
+
+      await callTelegram(token, 'editMessageText', payload);
       return new Response('OK', { status: 200 });
     }
 
@@ -191,7 +191,6 @@ export async function handleUpdate(update, env) {
     }
     game.turnUserId = userId;
 
-    // بررسی محدودیت ۱۰ دقیقه برای بازگشت کاربر اخراج شده
     if (game.errors[userId] >= 4) {
       const banTime = game.banTimes[userId] || 0;
       const now = Date.now();
@@ -209,7 +208,6 @@ export async function handleUpdate(update, env) {
         });
         return new Response('OK', { status: 200 });
       } else {
-        // زمان تمام شده، بخشش بازیکن و ریست کردن خطاهای او
         game.errors[userId] = 0;
         delete game.banTimes[userId];
       }
@@ -272,7 +270,7 @@ export async function handleUpdate(update, env) {
       }
 
       if (game.errors[userId] >= 4) {
-        game.banTimes[userId] = Date.now(); // ثبت زمان محرومیت ۱۰ دقیقه‌ای
+        game.banTimes[userId] = Date.now();
         
         await callTelegram(token, 'answerCallbackQuery', {
           callback_query_id: query.id,
@@ -289,7 +287,6 @@ export async function handleUpdate(update, env) {
       const isFinished = game.board.every((val, idx) => val === game.solution[idx]);
 
       if (isFinished) {
-        // محاسبه بیشترین امتیاز و تعیین برنده مجموع
         let sortedScores = Object.entries(game.scores).sort((a, b) => b[1] - a[1]);
         
         let scoresText = sortedScores
@@ -320,4 +317,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-                                            }
+}
