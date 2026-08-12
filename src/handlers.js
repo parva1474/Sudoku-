@@ -122,8 +122,6 @@ export async function handleUpdate(update, env) {
   if (update.callback_query) {
     const query = update.callback_query;
     const data = query.data;
-    const chatId = query.message.chat.id;
-    const messageId = query.message.message_id;
     const userId = query.from.id;
     const userName = query.from.first_name || 'بازیکن';
 
@@ -131,11 +129,18 @@ export async function handleUpdate(update, env) {
       callback_query_id: query.id
     });
 
-    let game = activeGames.get(chatId);
+    const chatId = query.message && query.message.chat ? query.message.chat.id : null;
+    const messageId = query.message ? query.message.message_id : null;
+    const inlineMessageId = query.inline_message_id;
+
+    if (!chatId && !inlineMessageId) {
+      return new Response('OK', { status: 200 });
+    }
+
+    let game = chatId ? activeGames.get(chatId) : activeGames.get(inlineMessageId);
 
     if (data.startsWith('difficulty:') || data === 'action:new') {
       const difficulty = data.startsWith('difficulty:') ? data.split(':')[1] : (game?.difficulty || 'easy');
-      
       const newPuzzleObj = generateSudoku(difficulty);
       
       game = {
@@ -147,25 +152,34 @@ export async function handleUpdate(update, env) {
         playerNames: {},
         usedPuzzles: new Set([newPuzzleObj.id])
       };
-      activeGames.set(chatId, game);
+      
+      if (chatId) activeGames.set(chatId, game);
+      else activeGames.set(inlineMessageId, game);
 
       game.playerNames[userId] = userName;
       game.turnUserId = userId;
 
-      await callTelegram(token, 'editMessageText', {
-        chat_id: chatId,
-        message_id: messageId,
+      const payload = {
         text: createBoardText(game, -1) + "\n\n👇 <b>یک بلوک انتخاب کنید:</b>",
         parse_mode: 'HTML',
         reply_markup: buildSudokuGridKeyboard(game.board)
-      });
+      };
+
+      if (chatId) {
+        payload.chat_id = chatId;
+        payload.message_id = messageId;
+        await callTelegram(token, 'editMessageText', payload);
+      } else {
+        payload.inline_message_id = inlineMessageId;
+        await callTelegram(token, 'editMessageText', payload);
+      }
       return new Response('OK', { status: 200 });
     }
 
     if (!game) {
       await callTelegram(token, 'answerCallbackQuery', {
         callback_query_id: query.id,
-        text: 'بازی منقضی شده است. لطفاً /start را بزنید.',
+        text: 'بازی منقضی شده است. لطفاً دوباره شروع کنید.',
         show_alert: true
       });
       return new Response('OK', { status: 200 });
@@ -185,16 +199,22 @@ export async function handleUpdate(update, env) {
       return new Response('OK', { status: 200 });
     }
 
+    const editPayload = {
+      parse_mode: 'HTML'
+    };
+    if (chatId) {
+      editPayload.chat_id = chatId;
+      editPayload.message_id = messageId;
+    } else {
+      editPayload.inline_message_id = inlineMessageId;
+    }
+
     if (data.startsWith('box:')) {
       const boxIndex = parseInt(data.split(':')[1], 10);
-
-      await callTelegram(token, 'editMessageText', {
-        chat_id: chatId,
-        message_id: messageId,
-        text: createBoardText(game, -1) + `\n\n👇 <b>خانه مورد نظر را انتخاب کنید:</b>`,
-        parse_mode: 'HTML',
-        reply_markup: buildBoxCellsKeyboard(game.board, boxIndex)
-      });
+      editPayload.text = createBoardText(game, -1) + `\n\n👇 <b>خانه مورد نظر را انتخاب کنید:</b>`;
+      editPayload.reply_markup = buildBoxCellsKeyboard(game.board, boxIndex);
+      
+      await callTelegram(token, 'editMessageText', editPayload);
       return new Response('OK', { status: 200 });
     }
 
@@ -206,13 +226,10 @@ export async function handleUpdate(update, env) {
       game.activeBox = boxIndex;
       game.activeCell = cellIndex;
 
-      await callTelegram(token, 'editMessageText', {
-        chat_id: chatId,
-        message_id: messageId,
-        text: createBoardText(game, cellIndex) + `\n\n👇 <b>عدد را انتخاب کنید:</b>`,
-        parse_mode: 'HTML',
-        reply_markup: buildNumberKeyboard(boxIndex, cellIndex)
-      });
+      editPayload.text = createBoardText(game, cellIndex) + `\n\n👇 <b>عدد را انتخاب کنید:</b>`;
+      editPayload.reply_markup = buildNumberKeyboard(boxIndex, cellIndex);
+
+      await callTelegram(token, 'editMessageText', editPayload);
       return new Response('OK', { status: 200 });
     }
 
@@ -239,14 +256,11 @@ export async function handleUpdate(update, env) {
       }
 
       if (game.errors[userId] >= 4) {
-        await callTelegram(token, 'editMessageText', {
-          chat_id: chatId,
-          message_id: messageId,
-          text: createBoardText(game, -1) + `\n\n❌ <b>${userName}</b> ۴ خطای مجاز را پر کرد و باخت!`,
-          parse_mode: 'HTML',
-          reply_markup: buildFinishedKeyboard()
-        });
-        activeGames.delete(chatId);
+        editPayload.text = createBoardText(game, -1) + `\n\n❌ <b>${userName}</b> ۴ خطای مجاز را پر کرد و باخت!`;
+        editPayload.reply_markup = buildFinishedKeyboard();
+        await callTelegram(token, 'editMessageText', editPayload);
+        if (chatId) activeGames.delete(chatId);
+        else activeGames.delete(inlineMessageId);
         return new Response('OK', { status: 200 });
       }
 
@@ -257,36 +271,25 @@ export async function handleUpdate(update, env) {
           .map(([id, score]) => `👤 ${game.playerNames[id]}: ${score} امتیاز`)
           .join('\n');
 
-        await callTelegram(token, 'editMessageText', {
-          chat_id: chatId,
-          message_id: messageId,
-          text: createBoardText(game, -1) + `\n\n🏆 تبریک! جدول کامل شد!\n\n${scoresText}`,
-          parse_mode: 'HTML',
-          reply_markup: buildFinishedKeyboard()
-        });
+        editPayload.text = createBoardText(game, -1) + `\n\n🏆 تبریک! جدول کامل شد!\n\n${scoresText}`;
+        editPayload.reply_markup = buildFinishedKeyboard();
       } else {
-        await callTelegram(token, 'editMessageText', {
-          chat_id: chatId,
-          message_id: messageId,
-          text: createBoardText(game, -1) + `\n\n👇 <b>خانه دیگری انتخاب کنید:</b>`,
-          parse_mode: 'HTML',
-          reply_markup: buildBoxCellsKeyboard(game.board, boxIndex)
-        });
+        editPayload.text = createBoardText(game, -1) + `\n\n👇 <b>خانه دیگری انتخاب کنید:</b>`;
+        editPayload.reply_markup = buildBoxCellsKeyboard(game.board, boxIndex);
       }
+
+      await callTelegram(token, 'editMessageText', editPayload);
       return new Response('OK', { status: 200 });
     }
 
     if (data === 'action:grid') {
-      await callTelegram(token, 'editMessageText', {
-        chat_id: chatId,
-        message_id: messageId,
-        text: createBoardText(game, -1) + "\n\n👇 <b>یک بلوک انتخاب کنید:</b>",
-        parse_mode: 'HTML',
-        reply_markup: buildSudokuGridKeyboard(game.board)
-      });
+      editPayload.text = createBoardText(game, -1) + "\n\n👇 <b>یک بلوک انتخاب کنید:</b>";
+      editPayload.reply_markup = buildSudokuGridKeyboard(game.board);
+      
+      await callTelegram(token, 'editMessageText', editPayload);
       return new Response('OK', { status: 200 });
     }
   }
 
   return new Response('OK', { status: 200 });
-}
+      }
