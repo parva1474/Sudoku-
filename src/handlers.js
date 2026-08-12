@@ -176,6 +176,7 @@ export async function handleUpdate(update, env) {
 
       game = {
         board: [...newPuzzleObj.puzzle],
+        puzzle: [...newPuzzleObj.puzzle], // ذخیره اعداد ثابت جدول اولیه
         solution: [...newPuzzleObj.solution],
         difficulty: difficulty,
         scores: {},
@@ -359,7 +360,7 @@ export async function handleUpdate(update, env) {
       }
 
       editPayload.text = createBoardText(game, -1) + `\n\n👇 <b>خانه مورد نظر را انتخاب کنید:</b>`;
-      editPayload.reply_markup = buildBoxCellsKeyboard(game.board, boxIndex);
+      editPayload.reply_markup = buildBoxCellsKeyboard(game.board, game.puzzle, boxIndex);
       
       await callTelegram(token, 'editMessageText', editPayload);
       return new Response('OK', { status: 200 });
@@ -369,6 +370,16 @@ export async function handleUpdate(update, env) {
       const parts = data.split(':');
       const boxIndex = parseInt(parts[1], 10);
       const cellIndex = parseInt(parts[2], 10);
+
+      // جلوگیری از انتخاب و تغییر خانه‌های اصلی و ثابت پازل
+      if (game.puzzle && game.puzzle[cellIndex] !== 0) {
+        await callTelegram(token, 'answerCallbackQuery', {
+          callback_query_id: query.id,
+          text: '🔒 این خانه جزء اعداد اصلی و ثابت جدول است و قابل تغییر نیست!',
+          show_alert: true
+        });
+        return new Response('OK', { status: 200 });
+      }
 
       game.activeBox = boxIndex;
       game.activeCell = cellIndex;
@@ -388,6 +399,16 @@ export async function handleUpdate(update, env) {
       const num = parseInt(parts[2], 10);
       
       const boxIndex = game.activeBox !== undefined ? game.activeBox : 0;
+
+      // محافظت اضافی در بک‌اند برای جلوگیری از دستکاری خانه اصلی
+      if (game.puzzle && game.puzzle[cellIndex] !== 0) {
+        await callTelegram(token, 'answerCallbackQuery', {
+          callback_query_id: query.id,
+          text: '🔒 این خانه ثابت است!',
+          show_alert: true
+        });
+        return new Response('OK', { status: 200 });
+      }
 
       if (!game.scores[userId]) game.scores[userId] = 0;
       if (!globalScores[userId]) globalScores[userId] = 0;
@@ -417,7 +438,7 @@ export async function handleUpdate(update, env) {
         });
 
         editPayload.text = createBoardText(game, -1) + `\n\n❌ <b>${userName}</b> ۴ خطای مجاز را پر کرد و موقتاً اخراج شد!`;
-        editPayload.reply_markup = buildBoxCellsKeyboard(game.board, boxIndex);
+        editPayload.reply_markup = buildBoxCellsKeyboard(game.board, game.puzzle, boxIndex);
         if (kv) await kv.put(gameKey, JSON.stringify(game), { expirationTtl: 86400 });
         await callTelegram(token, 'editMessageText', editPayload);
         return new Response('OK', { status: 200 });
@@ -458,4 +479,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-        }
+}
