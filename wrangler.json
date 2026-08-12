@@ -1,9 +1,11 @@
 {
-name = "sudoku"
-main = "src/index.js"
-compatibility_date = "2026-08-13"
-
-[[kv_namespaces]]
-binding = "SUDOKU_KV"
-id = "19f1148653a84ba9ae73ef0d711cfbcd"
+  "name": "sudoku",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-13",
+  "kv_namespaces": [
+    {
+      "binding": "SUDOKU_KV",
+      "id": "19f1148653a84ba9ae73ef0d711cfbcd"
+    }
+  ]
 }
