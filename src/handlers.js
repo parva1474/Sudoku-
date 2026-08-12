@@ -39,9 +39,9 @@ export function createBoardText(game, highlightCell = -1) {
     }
     gridStr += "\n";
     
-    // خط‌چین افقی کامل و بدون علامت +
+    // خط‌چین افقی منظم و هم‌اندازه با عرض جدول
     if ((row + 1) % 3 === 0 && row < 8) {
-      gridStr += "-------------------------|\n";
+      gridStr += "------+-------+------\n";
     }
   }
   
@@ -303,4 +303,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-          }
+}
