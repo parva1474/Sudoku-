@@ -1525,5 +1525,15 @@ function safeJSON(
     ) {
 
       return fallback;
+    }
+
+
+    return JSON.parse(
+      value
+    );
+
+  } catch {
+
+    return fallback;
   }
-  }
+}
