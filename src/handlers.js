@@ -84,6 +84,60 @@ const SUDOKU_PUZZLES = {
     ]
   }
 };
+const BOX_COLORS_BG = [
+  "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨",
+  "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨",
+  "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨",
+
+  "🟩", "🟩", "🟩",  "🟦", "🟦", "🟦",  "🟪", "🟪", "🟪",
+  "🟩", "🟩", "🟩",  "🟦", "🟦", "🟦",  "🟪", "🟪", "🟪",
+  "🟩", "🟩", "🟩",  "🟦", "🟦", "🟦",  "🟪", "🟪", "🟪",
+
+  "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨",
+  "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨",
+  "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨"
+];
+
+export function createBoardText(game, highlightCell = -1) {
+  let gridStr = "🧩 <b>سودوکو آنلاین</b>\n\n<code>";
+  
+  const board = game.board || Array(81).fill(0);
+
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 9; col++) {
+      const idx = row * 9 + col;
+      const val = board[idx];
+      
+      // تعیین رنگ پس‌زمینه بر اساس بلوک مربوطه
+      const colorIcon = BOX_COLORS_BG[idx];
+      
+      if (idx === highlightCell) {
+        gridStr += `[${val ? val : '·'}]`;
+      } else if (val !== 0) {
+        gridStr += ` ${val} `;
+      } else {
+        // برای خانه‌های خالی از ایموجی رنگی همان بلوک استفاده می‌کنیم
+        gridStr += colorIcon;
+      }
+      
+      if ((col + 1) % 3 === 0 && col < 8) {
+        gridStr += "|";
+      }
+    }
+    gridStr += "\n";
+    
+    if ((row + 1) % 3 === 0 && row < 8) {
+      gridStr += "---------------------\n";
+    }
+  }
+  
+  const filledCount = board.filter(v => v !== 0).length;
+  game.progress = Math.round((filledCount / 81) * 100);
+
+  gridStr += "</code>\n\n📊 <b>پیشرفت:</b> " + game.progress + "% | ❌ <b>اشتباه:</b> " + (game.errors || 0);
+  
+  return gridStr;
+}
 
 export function createBoardText(game, highlightCell = -1) {
   let gridStr = "🧩 <b>سودوکو آنلاین</b>\n\n<code>";
