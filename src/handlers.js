@@ -44,7 +44,7 @@ export function createBoardText(game, highlightCell = -1) {
     }
   }
 
-  // محاسبه تعداد باقیمانده هر عدد (از ۹ عدد کل برای هر رقم)
+  // محاسبه تعداد باقیمانده هر عدد
   const counts = {};
   for (let i = 1; i <= 9; i++) {
     counts[i] = 9;
@@ -75,7 +75,6 @@ export function createBoardText(game, highlightCell = -1) {
   return gridStr;
 }
 
-// بررسی اینکه آیا یک بلوک 3x3 کامل شده است یا خیر
 function isBoxComplete(board, boxIndex) {
   const startRow = Math.floor(boxIndex / 3) * 3;
   const startCol = (boxIndex % 3) * 3;
@@ -244,10 +243,18 @@ export async function handleUpdate(update, env) {
       editPayload.inline_message_id = inlineMessageId;
     }
 
+    if (data.startsWith('box_done:')) {
+      await callTelegram(token, 'answerCallbackQuery', {
+        callback_query_id: query.id,
+        text: 'این بلوک قبلاً تکمیل شده است!',
+        show_alert: true
+      });
+      return new Response('OK', { status: 200 });
+    }
+
     if (data.startsWith('box:')) {
       const boxIndex = parseInt(data.split(':')[1], 10);
       
-      // اگر بلوک از قبل کامل شده باشد، اجازه ورود ندهیم
       if (isBoxComplete(game.board, boxIndex)) {
         await callTelegram(token, 'answerCallbackQuery', {
           callback_query_id: query.id,
@@ -289,14 +296,12 @@ export async function handleUpdate(update, env) {
       if (!game.scores[userId]) game.scores[userId] = 0;
       if (!game.errors[userId]) game.errors[userId] = 0;
 
-      let isCorrect = false;
       if (num === 0) {
         game.board[cellIndex] = 0;
       } else {
         if (game.solution[cellIndex] === num) {
           game.board[cellIndex] = num;
           game.scores[userId] += 1;
-          isCorrect = true;
         } else {
           game.errors[userId] += 1;
           game.scores[userId] = Math.max(0, game.scores[userId] - 2);
@@ -333,7 +338,7 @@ export async function handleUpdate(update, env) {
         editPayload.text = createBoardText(game, -1) + `\n\n🏆 <b>بازی به پایان رسید و جدول کامل شد!</b>\n\n${scoresText}`;
         editPayload.reply_markup = buildFinishedKeyboard();
       } else {
-        // هر وقت عددی درست زده می‌شود یا به طور کلی پس از انتخاب عدد، به صفحه انتخاب بلوک برمی‌گردیم
+        // بعد از ثبت هر عدد (چه درست و چه غلط یا پاک کردن)، به صفحه انتخاب بلوک برمی‌گردد
         editPayload.text = createBoardText(game, -1) + `\n\n👇 <b>یک بلوک انتخاب کنید:</b>`;
         editPayload.reply_markup = buildSudokuGridKeyboard(game.board);
       }
@@ -352,4 +357,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-          }
+}
