@@ -4,9 +4,9 @@ import {
   buildDifficultyKeyboard, 
   buildFinishedKeyboard 
 } from './keyboard.js';
-import { generateSudoku, solveSudoku } from 'sudoku-core';
+import Sudoku from 'sudoku-core';
 
-// شیء ذخیره موقت وضعیت بازی‌ها (در حافظه ورکر)
+// شیء ذخیره موقت وضعیت بازی‌ها در حافظه
 const activeGames = new Map();
 
 export function createBoardText(game, selectedCell = -1) {
@@ -86,12 +86,13 @@ export async function handleUpdate(update, env) {
     if (data.startsWith('difficulty:') || data === 'action:new') {
       const difficulty = data.startsWith('difficulty:') ? data.split(':')[1] : (game?.difficulty || 'easy');
       
-      // تولید سودوکوی واقعی با استفاده از پکیج sudoku-core
-      const puzzle = generateSudoku({ difficulty });
+      // استفاده از متد استاندارد sudoku-core برای ساخت پازل
+      const puzzleObj = new Sudoku();
+      const generated = puzzleObj.generate({ level: difficulty });
       
       game = {
-        board: puzzle.puzzle.map(val => val === null ? 0 : val),
-        solution: puzzle.solution,
+        board: generated.puzzle.split('').map(val => val === '.' || val === '0' ? 0 : parseInt(val, 10)),
+        solution: generated.solution.split('').map(val => parseInt(val, 10)),
         difficulty: difficulty,
         progress: 0,
         errors: 0
@@ -110,11 +111,11 @@ export async function handleUpdate(update, env) {
     }
 
     if (!game) {
-      // اگر بازی موجود نبود، یک بازی پیش‌فرض می‌سازیم
-      const puzzle = generateSudoku({ difficulty: 'easy' });
+      const puzzleObj = new Sudoku();
+      const generated = puzzleObj.generate({ level: 'easy' });
       game = {
-        board: puzzle.puzzle.map(val => val === null ? 0 : val),
-        solution: puzzle.solution,
+        board: generated.puzzle.split('').map(val => val === '.' || val === '0' ? 0 : parseInt(val, 10)),
+        solution: generated.solution.split('').map(val => parseInt(val, 10)),
         difficulty: 'easy',
         progress: 0,
         errors: 0
@@ -147,4 +148,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-}
+  }
