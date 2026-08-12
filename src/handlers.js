@@ -11,7 +11,6 @@ import {
 } from './keyboard.js';
 import { generateSudoku } from './sudokuGenerator.js';
 
-const activeGames = new Map();
 const globalScores = {};
 
 export function createBoardText(game, highlightCell = -1) {
@@ -20,7 +19,6 @@ export function createBoardText(game, highlightCell = -1) {
   const filledCount = board.filter(v => v !== 0).length;
   game.progress = Math.round((filledCount / 81) * 100);
 
-  // جدول با فاصله استاندارد و خوانا داخل تگ code
   let gridStr = `🧩 <b>سودوکو چندنفره آنلاین</b>\n👤 بازیکن: ${game.playerNames[game.turnUserId] || 'بازیکن'}\n\n<code>`;
 
   for (let row = 0; row < 9; row++) {
@@ -47,7 +45,6 @@ export function createBoardText(game, highlightCell = -1) {
   }
   gridStr += `</code>`;
 
-  // آمار و امتیازات خارج از تگ code برای جلوگیری از به هم ریختگی
   const counts = {};
   for (let i = 1; i <= 9; i++) {
     counts[i] = 9;
@@ -103,6 +100,7 @@ async function callTelegram(token, method, payload) {
 
 export async function handleUpdate(update, env) {
   const token = env.BOT_TOKEN;
+  const kv = env.SUDOKU_KV; // پایگاه داده ابری کلادفلر
 
   if (update.message) {
     const msg = update.message;
@@ -161,46 +159,15 @@ export async function handleUpdate(update, env) {
       return new Response('OK', { status: 200 });
     }
 
-    const gameKey = chatId ? chatId : inlineMessageId;
-    let game = activeGames.get(gameKey);
+    const gameKey = chatId ? `game_${chatId}` : `game_${inlineMessageId}`;
+    let gameStr = kv ? await kv.get(gameKey) : null;
+    let game = gameStr ? JSON.parse(gameStr) : null;
 
     if (data.startsWith('difficulty:') || data === 'action:new') {
       const difficulty = data.startsWith('difficulty:') ? data.split(':')[1] : (game?.difficulty || 'easy');
       
-      let newPuzzleObj;
-      let attempts = 0;
-      do {
-        newPuzzleObj = generateSudoku(difficulty);
-        attempts++;
-      } while (game && game.usedPuzzles && game.usedPuzzles.has(newPuzzleObj.id) && attempts < 10);
+      let newPuzzleObj = generateSudoku(difficulty);
 
-      const usedPuzzlesSet = game && game.usedPuzzles ? game.usedPuzzles : new Set();
-      usedPuzzlesSet.add(newPuzzleObj.id);
-
-      if (data === 'action:new' && chatId) {
-        game = {
-          board: [...newPuzzleObj.puzzle],
-          solution: [...newPuzzleObj.solution],
-          difficulty: difficulty,
-          scores: {},
-          errors: {},
-          banTimes: {},
-          playerNames: {},
-          usedPuzzles: usedPuzzlesSet
-        };
-        activeGames.set(gameKey, game);
-        game.playerNames[userId] = userName;
-        game.turnUserId = userId;
-
-        await callTelegram(token, 'sendMessage', {
-          chat_id: chatId,
-          text: createBoardText(game, -1) + "\n\n👇 <b>یک بلوک انتخاب کنید:</b>",
-          parse_mode: 'HTML',
-          reply_markup: buildSudokuGridKeyboard(game.board)
-        });
-        return new Response('OK', { status: 200 });
-      }
-      
       game = {
         board: [...newPuzzleObj.puzzle],
         solution: [...newPuzzleObj.solution],
@@ -209,13 +176,12 @@ export async function handleUpdate(update, env) {
         errors: {},
         banTimes: {},
         playerNames: {},
-        usedPuzzles: usedPuzzlesSet
       };
       
-      activeGames.set(gameKey, game);
-
       game.playerNames[userId] = userName;
       game.turnUserId = userId;
+
+      if (kv) await kv.put(gameKey, JSON.stringify(game), { expirationTtl: 86400 }); // ذخیره برای ۲۴ ساعت
 
       const payload = {
         text: createBoardText(game, -1) + "\n\n👇 <b>یک بلوک انتخاب کنید:</b>",
@@ -230,6 +196,16 @@ export async function handleUpdate(update, env) {
         payload.inline_message_id = inlineMessageId;
       }
 
+      if (data === 'action:new' && chatId) {
+        await callTelegram(token, 'sendMessage', {
+          chat_id: chatId,
+          text: createBoardText(game, -1) + "\n\n👇 <b>یک بلوک انتخاب کنید:</b>",
+          parse_mode: 'HTML',
+          reply_markup: buildSudokuGridKeyboard(game.board)
+        });
+        return new Response('OK', { status: 200 });
+      }
+
       await callTelegram(token, 'editMessageText', payload);
       return new Response('OK', { status: 200 });
     }
@@ -237,7 +213,7 @@ export async function handleUpdate(update, env) {
     if (!game) {
       await callTelegram(token, 'answerCallbackQuery', {
         callback_query_id: query.id,
-        text: 'بازی منقضی شده است. لطفاً دوباره شروع کنید.',
+        text: 'بازی منقضی یا یافت نشد. لطفاً با /start بازی جدید بسازید.',
         show_alert: true
       });
       return new Response('OK', { status: 200 });
@@ -328,6 +304,7 @@ export async function handleUpdate(update, env) {
       editPayload.text = createBoardText(game, cellIndex) + `\n\n👇 <b>عدد را انتخاب کنید:</b>`;
       editPayload.reply_markup = buildNumberKeyboard(game.board, boxIndex, cellIndex);
 
+      if (kv) await kv.put(gameKey, JSON.stringify(game), { expirationTtl: 86400 });
       await callTelegram(token, 'editMessageText', editPayload);
       return new Response('OK', { status: 200 });
     }
@@ -368,6 +345,7 @@ export async function handleUpdate(update, env) {
 
         editPayload.text = createBoardText(game, -1) + `\n\n❌ <b>${userName}</b> ۴ خطای مجاز را پر کرد و موقتاً اخراج شد!`;
         editPayload.reply_markup = buildBoxCellsKeyboard(game.board, boxIndex);
+        if (kv) await kv.put(gameKey, JSON.stringify(game), { expirationTtl: 86400 });
         await callTelegram(token, 'editMessageText', editPayload);
         return new Response('OK', { status: 200 });
       }
@@ -391,6 +369,7 @@ export async function handleUpdate(update, env) {
         editPayload.reply_markup = buildSudokuGridKeyboard(game.board);
       }
 
+      if (kv) await kv.put(gameKey, JSON.stringify(game), { expirationTtl: 86400 });
       await callTelegram(token, 'editMessageText', editPayload);
       return new Response('OK', { status: 200 });
     }
@@ -399,10 +378,11 @@ export async function handleUpdate(update, env) {
       editPayload.text = createBoardText(game, -1) + "\n\n👇 <b>یک بلوک انتخاب کنید:</b>";
       editPayload.reply_markup = buildSudokuGridKeyboard(game.board);
       
+      if (kv) await kv.put(gameKey, JSON.stringify(game), { expirationTtl: 86400 });
       await callTelegram(token, 'editMessageText', editPayload);
       return new Response('OK', { status: 200 });
     }
   }
 
   return new Response('OK', { status: 200 });
-            }
+  }
