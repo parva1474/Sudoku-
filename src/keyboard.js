@@ -38,9 +38,9 @@ export function buildSudokuGridKeyboard(board) {
       let boxIndex = bRow * 3 + bCol;
       
       if (isBoxComplete(board, boxIndex)) {
-        rowButtons.push({ text: `✅ بلوک ${boxIndex + 1} (تکمیل)`, callback_data: `box_done:${boxIndex}` });
+        rowButtons.push({ text: `✅ ${boxIndex + 1}`, callback_data: `box_done:${boxIndex}` });
       } else {
-        rowButtons.push({ text: `🟦 بلوک ${boxIndex + 1}`, callback_data: `box:${boxIndex}` });
+        rowButtons.push({ text: `🟦 ${boxIndex + 1}`, callback_data: `box:${boxIndex}` });
       }
     }
     keyboard.push(rowButtons);
@@ -49,7 +49,6 @@ export function buildSudokuGridKeyboard(board) {
   return { inline_keyboard: keyboard };
 }
 
-// اضافه شدن puzzle برای تشخیص خانه‌های اصلی
 export function buildBoxCellsKeyboard(board, puzzle, boxIndex) {
   let keyboard = [];
   const startRow = Math.floor(boxIndex / 3) * 3;
@@ -66,9 +65,9 @@ export function buildBoxCellsKeyboard(board, puzzle, boxIndex) {
 
       let text;
       if (isOriginal) {
-        text = `🔒 ${val} (ثابت)`;
+        text = `🔒 ${val}`;
       } else {
-        text = val !== 0 ? `✏️ ${val}` : `▫️ خالی`;
+        text = val !== 0 ? `✏️ ${val}` : `▫️`;
       }
 
       rowButtons.push({ text: text, callback_data: `cell:${boxIndex}:${cellIndex}` });
@@ -77,7 +76,7 @@ export function buildBoxCellsKeyboard(board, puzzle, boxIndex) {
   }
 
   keyboard.push([
-    { text: '🔙 بازگشت به جدول کل', callback_data: 'action:grid' }
+    { text: '🔙 بازگشت', callback_data: 'action:grid' }
   ]);
 
   return { inline_keyboard: keyboard };
@@ -97,7 +96,7 @@ export function buildNumberKeyboard(board, boxIndex, cellIndex, userScore = 0) {
 
   const createNumButton = (num) => {
     if (counts[num] <= 0) {
-      return { text: `☑️ ${num} (تکمیل)`, callback_data: `num_done:${num}` };
+      return { text: `☑️ ${num}`, callback_data: `num_done:${num}` };
     }
     const icons = ['', '🟥 ۱', '🟧 ۲', '🟨 ۳', '🟩 ۴', '🟦 ۵', '🟪 ۶', '🟫 ۷', '⬛ ۸', '⬜ ۹'];
     return { text: icons[num], callback_data: `num:${cellIndex}:${num}` };
@@ -108,13 +107,13 @@ export function buildNumberKeyboard(board, boxIndex, cellIndex, userScore = 0) {
     [createNumButton(4), createNumButton(5), createNumButton(6)],
     [createNumButton(7), createNumButton(8), createNumButton(9)],
     [
-      { text: '🧹 پاک کردن خانه', callback_data: `num:${cellIndex}:0` }
+      { text: '🧹 پاک کردن', callback_data: `num:${cellIndex}:0` }
     ]
   ];
 
   if (userScore >= 5) {
     keyboard.push([
-      { text: '💡 راهنما (-5 امتیاز)', callback_data: `hint:${cellIndex}` }
+      { text: '💡 راهنما (-5)', callback_data: `hint:${cellIndex}` }
     ]);
   }
 
@@ -126,7 +125,7 @@ export function buildNumberKeyboard(board, boxIndex, cellIndex, userScore = 0) {
   }
 
   keyboard.push([
-    { text: '🔙 بازگشت به بلوک', callback_data: `box:${boxIndex}` }
+    { text: '🔙 بازگشت', callback_data: `box:${boxIndex}` }
   ]);
 
   return {
@@ -138,8 +137,8 @@ export function buildFinishedKeyboard() {
   return {
     inline_keyboard: [
       [
-        { text: '🔄 بازی مجدد (جدول جدید)', callback_data: 'action:new' }
+        { text: '🔄 بازی مجدد', callback_data: 'action:new' }
       ]
     ]
   };
-}
+      }
