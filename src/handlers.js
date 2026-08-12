@@ -93,7 +93,9 @@ export function createBoardText(game, selectedCell = -1) {
       const val = board[idx];
       let char = val ? String(val) : "·";
       
-      if (idx === selectedCell) {
+      if (row === game.selectedRow) {
+        gridStr += `[${char}]`; // هایلایت سطر انتخاب شده در جدول متنی
+      } else if (idx === selectedCell) {
         gridStr += `[${char}]`;
       } else {
         gridStr += ` ${char} `;
@@ -114,7 +116,12 @@ export function createBoardText(game, selectedCell = -1) {
   game.progress = Math.round((filledCount / 81) * 100);
 
   gridStr += "</code>\n\n📊 <b>پیشرفت:</b> " + game.progress + "% | ❌ <b>اشتباه:</b> " + (game.errors || 0);
-  gridStr += "\n\n👇 روی سطر مورد نظر کلیک کنید:";
+  
+  if (game.selectedRow !== null && game.selectedRow !== undefined) {
+    gridStr += `\n\n📍 <b>سطر ${game.selectedRow + 1} انتخاب شد.</b> عدد را انتخاب کنید:`;
+  } else {
+    gridStr += "\n\n👇 روی سطر مورد نظر کلیک کنید:";
+  }
   
   return gridStr;
 }
@@ -156,7 +163,6 @@ export async function handleUpdate(update, env) {
 
     let game = activeGames.get(chatId);
 
-    // اگر بازی وجود نداشت، یک بازی پیش‌فرض بسازیم تا ارور ندهد
     if (!game) {
       const template = SUDOKU_PUZZLES.easy;
       game = {
@@ -201,7 +207,7 @@ export async function handleUpdate(update, env) {
       await callTelegram(token, 'editMessageText', {
         chat_id: chatId,
         message_id: messageId,
-        text: createBoardText(game) + `\n\n📍 سطر ${rowIndex + 1} انتخاب شد. حالا عدد مورد نظر را انتخاب کنید:`,
+        text: createBoardText(game),
         parse_mode: 'HTML',
         reply_markup: buildNumberKeyboard(game)
       });
@@ -234,6 +240,7 @@ export async function handleUpdate(update, env) {
       const isFinished = game.board.every((val, idx) => val === game.solution[idx]);
 
       if (isFinished) {
+        game.selectedRow = null;
         await callTelegram(token, 'editMessageText', {
           chat_id: chatId,
           message_id: messageId,
@@ -242,6 +249,7 @@ export async function handleUpdate(update, env) {
           reply_markup: buildFinishedKeyboard()
         });
       } else {
+        game.selectedRow = null; // بازنشانی سطر پس از ثبت عدد
         await callTelegram(token, 'editMessageText', {
           chat_id: chatId,
           message_id: messageId,
@@ -269,4 +277,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-        }
+    }
