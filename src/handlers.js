@@ -1,5 +1,6 @@
 import { 
   buildSudokuGridKeyboard, 
+  buildBoxCellsKeyboard,
   buildNumberKeyboard, 
   buildDifficultyKeyboard, 
   buildFinishedKeyboard 
@@ -82,8 +83,8 @@ const SUDOKU_PUZZLES = {
   }
 };
 
-export function createBoardText(game, highlightRow = -1) {
-  let gridStr = "🧩 <b>سودوکو آنلاین</b>\n\n<code>";
+export function createBoardText(game, highlightCell = -1) {
+  let gridStr = "🧩 <b>سودوکو آنلاین (انتخاب بلوک ۳در۳)</b>\n\n<code>";
   
   const board = game.board || Array(81).fill(0);
 
@@ -93,7 +94,7 @@ export function createBoardText(game, highlightRow = -1) {
       const val = board[idx];
       let char = val ? String(val) : "·";
       
-      if (row === highlightRow) {
+      if (idx === highlightCell) {
         gridStr += `[${char}]`;
       } else {
         gridStr += ` ${char} `;
@@ -114,12 +115,6 @@ export function createBoardText(game, highlightRow = -1) {
   game.progress = Math.round((filledCount / 81) * 100);
 
   gridStr += "</code>\n\n📊 <b>پیشرفت:</b> " + game.progress + "% | ❌ <b>اشتباه:</b> " + (game.errors || 0);
-  
-  if (highlightRow !== -1) {
-    gridStr += `\n\n📍 <b>سطر ${highlightRow + 1} انتخاب شد.</b> عدد را انتخاب کنید:`;
-  } else {
-    gridStr += "\n\n👇 روی سطر مورد نظر کلیک کنید:";
-  }
   
   return gridStr;
 }
@@ -186,44 +181,61 @@ export async function handleUpdate(update, env) {
       await callTelegram(token, 'editMessageText', {
         chat_id: chatId,
         message_id: messageId,
-        text: createBoardText(game, -1),
+        text: createBoardText(game, -1) + "\n\n👇 <b>لطفاً یکی از ۹ بلوک ۳در۳ را انتخاب کنید:</b>",
         parse_mode: 'HTML',
         reply_markup: buildSudokuGridKeyboard(game.board)
       });
       return new Response('OK', { status: 200 });
     }
 
-    if (data.startsWith('row:')) {
-      const rowIndex = parseInt(data.split(':')[1], 10);
+    // انتخاب یک بلوک ۳در۳
+    if (data.startsWith('box:')) {
+      const boxIndex = parseInt(data.split(':')[1], 10);
 
       await callTelegram(token, 'editMessageText', {
         chat_id: chatId,
         message_id: messageId,
-        text: createBoardText(game, rowIndex),
+        text: createBoardText(game, -1) + `\n\n📦 <b>بلوک ${boxIndex + 1} انتخاب شد.</b> حالا خانه مورد نظر را از داخل بلوک انتخاب کنید:`,
         parse_mode: 'HTML',
-        reply_markup: buildNumberKeyboard(rowIndex)
+        reply_markup: buildBoxCellsKeyboard(game.board, boxIndex)
       });
       return new Response('OK', { status: 200 });
     }
 
+    // انتخاب یک خانه مشخص از داخل بلوک
+    if (data.startsWith('cell:')) {
+      const parts = data.split(':');
+      const boxIndex = parseInt(parts[1], 10);
+      const cellIndex = parseInt(parts[2], 10);
+
+      // ذخیره آخرین بلوک و خانه فعال در حافظه بازی برای بازگشت‌ها
+      game.activeBox = boxIndex;
+      game.activeCell = cellIndex;
+
+      await callTelegram(token, 'editMessageText', {
+        chat_id: chatId,
+        message_id: messageId,
+        text: createBoardText(game, cellIndex) + `\n\n🎯 <b>خانه انتخاب شد.</b> عدد مورد نظر (۱ تا ۹) را انتخاب کنید:`,
+        parse_mode: 'HTML',
+        reply_markup: buildNumberKeyboard(boxIndex, cellIndex)
+      });
+      return new Response('OK', { status: 200 });
+    }
+
+    // ثبت عدد در خانه مد نظر
     if (data.startsWith('num:')) {
       const parts = data.split(':');
-      const rowIndex = parseInt(parts[1], 10);
+      const cellIndex = parseInt(parts[1], 10);
       const num = parseInt(parts[2], 10);
       
-      let targetCol = -1;
-      for (let c = 0; c < 9; c++) {
-        const idx = rowIndex * 9 + c;
-        if (game.board[idx] === 0) {
-          targetCol = c;
-          break;
-        }
-      }
+      const boxIndex = game.activeBox !== undefined ? game.activeBox : 0;
 
-      if (targetCol !== -1) {
-        const targetIdx = rowIndex * 9 + targetCol;
-        if (game.solution[targetIdx] === num) {
-          game.board[targetIdx] = num;
+      if (num === 0) {
+        // پاک کردن خانه
+        game.board[cellIndex] = 0;
+      } else {
+        if (game.solution[cellIndex] === num) {
+          game.board[cellIndex] = num;
         } else {
           game.errors = (game.errors || 0) + 1;
         }
@@ -240,12 +252,13 @@ export async function handleUpdate(update, env) {
           reply_markup: buildFinishedKeyboard()
         });
       } else {
+        // برگشت به لیست خانه‌های همان بلوک تا کاربر بتواند خانه دیگری انتخاب کند
         await callTelegram(token, 'editMessageText', {
           chat_id: chatId,
           message_id: messageId,
-          text: createBoardText(game, -1),
+          text: createBoardText(game, -1) + `\n\n✅ عدد ثبت شد. خانه دیگری از بلوک ${boxIndex + 1} را انتخاب کنید یا بازگردید:`,
           parse_mode: 'HTML',
-          reply_markup: buildSudokuGridKeyboard(game.board)
+          reply_markup: buildBoxCellsKeyboard(game.board, boxIndex)
         });
       }
       return new Response('OK', { status: 200 });
@@ -255,7 +268,7 @@ export async function handleUpdate(update, env) {
       await callTelegram(token, 'editMessageText', {
         chat_id: chatId,
         message_id: messageId,
-        text: createBoardText(game, -1),
+        text: createBoardText(game, -1) + "\n\n👇 <b>لطفاً یکی از ۹ بلوک ۳در۳ را انتخاب کنید:</b>",
         parse_mode: 'HTML',
         reply_markup: buildSudokuGridKeyboard(game.board)
       });
@@ -264,4 +277,5 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-        }
+      }
+      
