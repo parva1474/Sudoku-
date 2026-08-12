@@ -75,7 +75,7 @@ export function buildBoxCellsKeyboard(board, boxIndex) {
   return { inline_keyboard: keyboard };
 }
 
-export function buildNumberKeyboard(board, boxIndex, cellIndex) {
+export function buildNumberKeyboard(board, boxIndex, cellIndex, userScore = 0) {
   const counts = {};
   for (let i = 1; i <= 9; i++) {
     counts[i] = 9;
@@ -95,18 +95,36 @@ export function buildNumberKeyboard(board, boxIndex, cellIndex) {
     return { text: icons[num], callback_data: `num:${cellIndex}:${num}` };
   };
 
-  return {
-    inline_keyboard: [
-      [createNumButton(1), createNumButton(2), createNumButton(3)],
-      [createNumButton(4), createNumButton(5), createNumButton(6)],
-      [createNumButton(7), createNumButton(8), createNumButton(9)],
-      [
-        { text: '🧹 پاک کردن خانه', callback_data: `num:${cellIndex}:0` }
-      ],
-      [
-        { text: '🔙 بازگشت به بلوک', callback_data: `box:${boxIndex}` }
-      ]
+  let keyboard = [
+    [createNumButton(1), createNumButton(2), createNumButton(3)],
+    [createNumButton(4), createNumButton(5), createNumButton(6)],
+    [createNumButton(7), createNumButton(8), createNumButton(9)],
+    [
+      { text: '🧹 پاک کردن خانه', callback_data: `num:${cellIndex}:0` }
     ]
+  ];
+
+  // اگر کاربر حداقل ۵ امتیاز داشت، کلید راهنما اضافه شود
+  if (userScore >= 5) {
+    keyboard.push([
+      { text: '💡 راهنما (-5 امتیاز)', callback_data: `hint:${cellIndex}` }
+    ]);
+  }
+
+  // اگر تعداد خانه‌های خالی کل جدول بین ۱ تا ۴ عدد بود، دکمه حل خودکار نمایش داده شود
+  const emptyCellsCount = board.filter(v => v === 0).length;
+  if (emptyCellsCount > 0 && emptyCellsCount <= 4) {
+    keyboard.push([
+      { text: '⚡ حل خودکار ۴ عدد آخر', callback_data: 'solve_last_four' }
+    ]);
+  }
+
+  keyboard.push([
+    { text: '🔙 بازگشت به بلوک', callback_data: `box:${boxIndex}` }
+  ]);
+
+  return {
+    inline_keyboard: keyboard
   };
 }
 
