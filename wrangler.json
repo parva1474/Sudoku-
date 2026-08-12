@@ -1,13 +1,7 @@
-{
-  "name": "sudoku",
-  "main": "src/worker.js",
-  "compatibility_date": "2026-08-10",
+name = "sudoku"
+main = "src/index.js"
+compatibility_date = "2026-08-13"
 
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "sudoku-db",
-      "database_id": "de674f38-d332-4710-b58f-378ce00dadfd"
-    }
-  ]
-}
+[[kv_namespaces]]
+binding = "SUDOKU_KV"
+id = "19f1148653a84ba9ae73ef0d711cfbcd"
