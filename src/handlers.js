@@ -62,7 +62,7 @@ export function createBoardText(game, highlightCell = -1) {
   const filledCount = board.filter(v => v !== 0).length;
   game.progress = Math.round((filledCount / 81) * 100);
 
-  gridStr += "</code>\n\n📊 <b>پیشرفت:</b> " + game.progress + "% | ⭐ <b>امتیاز فعلی:</b> " + (game.scores[game.turnUserId] || 0) + " | ❌ <b>خطاها:</b> " + (game.errors[game.turnUserId] || 0) + "/4";
+  gridStr += `</code>\n\n📊 <b>پیشرفت:</b> ${game.progress}% | ⭐ <b>امتیاز:</b> ${game.scores[game.turnUserId] || 0} | ❌ <b>خطا:</b> ${game.errors[game.turnUserId] || 0}/4`;
   
   return gridStr;
 }
@@ -317,4 +317,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-}
+        }
