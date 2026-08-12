@@ -14,9 +14,13 @@ import { generateSudoku } from './sudokuGenerator.js';
 const activeGames = new Map();
 
 export function createBoardText(game, highlightCell = -1) {
-  let gridStr = `🧩 <b>سودوکو چندنفره آنلاین</b>\n👤 بازیکن: ${game.playerNames[game.turnUserId] || 'بازیکن'}\n\n<code>`;
-  
   const board = game.board || Array(81).fill(0);
+
+  // محاسبه دقیق درصد پیشرفت بر اساس خانه‌های پرشده
+  const filledCount = board.filter(v => v !== 0).length;
+  game.progress = Math.round((filledCount / 81) * 100);
+
+  let gridStr = `🧩 <b>سودوکو چندنفره آنلاین</b>\n👤 بازیکن: ${game.playerNames[game.turnUserId] || 'بازیکن'}\n\n<code>`;
 
   for (let row = 0; row < 9; row++) {
     for (let col = 0; col < 9; col++) {
@@ -66,9 +70,6 @@ export function createBoardText(game, highlightCell = -1) {
     line2.push(`${i}:(${counts[i]})`);
   }
   remainingText += line1.join(' | ') + "\n" + line2.join(' | ');
-
-  const filledCount = board.filter(v => v !== 0).length;
-  game.progress = Math.round((filledCount / 81) * 100);
 
   gridStr += `</code>\n${remainingText}\n\n📊 <b>پیشرفت:</b> ${game.progress}% | ⭐ <b>امتیاز:</b> ${game.scores[game.turnUserId] || 0} | ❌ <b>خطا:</b> ${game.errors[game.turnUserId] || 0}/4`;
   
@@ -338,7 +339,6 @@ export async function handleUpdate(update, env) {
         editPayload.text = createBoardText(game, -1) + `\n\n🏆 <b>بازی به پایان رسید و جدول کامل شد!</b>\n\n${scoresText}`;
         editPayload.reply_markup = buildFinishedKeyboard();
       } else {
-        // بعد از ثبت هر عدد (چه درست و چه غلط یا پاک کردن)، به صفحه انتخاب بلوک برمی‌گردد
         editPayload.text = createBoardText(game, -1) + `\n\n👇 <b>یک بلوک انتخاب کنید:</b>`;
         editPayload.reply_markup = buildSudokuGridKeyboard(game.board);
       }
@@ -357,4 +357,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-}
+          }
