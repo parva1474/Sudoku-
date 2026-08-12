@@ -1,41 +1,35 @@
 // ==========================================
-// src/keyboard.js - نسخه نهایی با چیدمان بلوکی
+// src/keyboard.js - نسخه نهایی
 // ==========================================
 
 export function buildSudokuGridKeyboard(board, selectedCell = -1) {
   const keyboard = [];
-
-  for (let blockRow = 0; blockRow < 3; blockRow++) {
-    const rowButtons = [];
-
-    for (let blockCol = 0; blockCol < 3; blockCol++) {
-      // استفاده از کاراکترهای عددی و فاصله‌گذار برای حفظ چیدمان ۳در۳
-      let display = "";
-      for (let r = 0; r < 3; r++) {
-        for (let c = 0; c < 3; c++) {
-          const idx = ((blockRow * 3 + r) * 9) + (blockCol * 3 + c);
-          const val = board[idx] ? String(board[idx]) : "·";
-          display += val + (c < 2 ? " " : ""); 
-        }
-        if (r < 2) display += "\n";
-      }
-
-      rowButtons.push({
-        text: display,
-        callback_data: `block:${blockRow}_${blockCol}`
-      });
-    }
-    keyboard.push(rowButtons);
-  }
-
-  // دکمه‌های کنترلی پایین
+  
+  // دکمه‌های ناوبری سریع برای انتخاب سطرها/بخش‌ها
   keyboard.push([
-    { text: "✏️ مداد", callback_data: "mode:pencil" },
-    { text: "🧹 پاک کردن", callback_data: "mode:erase" }
+    { text: "1️⃣ سطر ۱", callback_data: "row:0" },
+    { text: "2️⃣ سطر ۲", callback_data: "row:1" },
+    { text: "3️⃣ سطر ۳", callback_data: "row:2" }
   ]);
   keyboard.push([
-    { text: "💡 راهنمایی", callback_data: "action:hint" },
-    { text: "🔄 جدید", callback_data: "action:new" }
+    { text: "4️⃣ سطر ۴", callback_data: "row:3" },
+    { text: "5️⃣ سطر ۵", callback_data: "row:4" },
+    { text: "6️⃣ سطر ۶", callback_data: "row:5" }
+  ]);
+  keyboard.push([
+    { text: "7️⃣ سطر ۷", callback_data: "row:6" },
+    { text: "8️⃣ سطر ۸", callback_data: "row:7" },
+    { text: "9️⃣ سطر ۹", callback_data: "row:8" }
+  ]);
+
+  keyboard.push([
+    { text: "✏️ مداد", callback_data: "mode:pencil" },
+    { text: "🧹 پاک کردن", callback_data: "mode:erase" },
+    { text: "💡 راهنمایی", callback_data: "action:hint" }
+  ]);
+  
+  keyboard.push([
+    { text: "🔄 بازی جدید", callback_data: "action:new" }
   ]);
 
   return { inline_keyboard: keyboard };
@@ -60,7 +54,7 @@ export function buildNumberKeyboard(game) {
         { text: "9", callback_data: "num:9" }
       ],
       [
-        { text: "🔙 بازگشت به جدول", callback_data: "action:grid" }
+        { text: "🔙 بازگشت به منو", callback_data: "action:grid" }
       ]
     ]
   };
