@@ -1,26 +1,25 @@
 // ==========================================
-// src/keyboard.js - کیبردهای رنگی بلوک‌های ۳در۳
+// src/keyboard.js
 // ==========================================
 
-const BOX_COLORS = ["🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "🟥", "🟧", "🟨"];
-const BOX_NAMES = ["بالا-چپ", "بالا-وسط", "بالا-راست", "وسط-چپ", "مرکز", "وسط-راست", "پایین-چپ", "پایین-وسط", "پایین-راست"];
+const BOX_COLORS = ["🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "🟫", "⬛", "⬜"];
 
 export function buildSudokuGridKeyboard(board) {
   const keyboard = [
     [
-      { text: "🟥 بلوک ۱", callback_data: "box:0" },
-      { text: "🟧 بلوک ۲", callback_data: "box:1" },
-      { text: "🟨 بلوک ۳", callback_data: "box:2" }
+      { text: "🟥 ۱", callback_data: "box:0" },
+      { text: "🟧 ۲", callback_data: "box:1" },
+      { text: "🟨 ۳", callback_data: "box:2" }
     ],
     [
-      { text: "🟩 بلوک ۴", callback_data: "box:3" },
-      { text: "🟦 بلوک ۵", callback_data: "box:4" },
-      { text: "🟪 بلوک ۶", callback_data: "box:5" }
+      { text: "🟩 ۴", callback_data: "box:3" },
+      { text: "🟦 ۵", callback_data: "box:4" },
+      { text: "🟪 ۶", callback_data: "box:5" }
     ],
     [
-      { text: "🟥 بلوک ۷", callback_data: "box:6" },
-      { text: "🟧 بلوک ۸", callback_data: "box:7" },
-      { text: "🟨 بلوک ۹", callback_data: "box:8" }
+      { text: "🟫 ۷", callback_data: "box:6" },
+      { text: "⬛ ۸", callback_data: "box:7" },
+      { text: "⬜ ۹", callback_data: "box:8" }
     ],
     [
       { text: "🔄 بازی جدید", callback_data: "action:new" }
@@ -58,7 +57,7 @@ export function buildBoxCellsKeyboard(board, boxIndex) {
   }
 
   keyboard.push([
-    { text: `🔙 بازگشت (${colorIcon} بلوک‌ها)`, callback_data: "action:grid" }
+    { text: `🔙 بازگشت به کل جدول`, callback_data: "action:grid" }
   ]);
 
   return { inline_keyboard: keyboard };
@@ -85,7 +84,7 @@ export function buildNumberKeyboard(boxIndex, cellIndex) {
       ],
       [
         { text: "❌ پاک کردن", callback_data: `num:${cellIndex}:0` },
-        { text: `🔙 بازگشت ${colorIcon}`, callback_data: `box:${boxIndex}` }
+        { text: `🔙 بازگشت به بلوک`, callback_data: `box:${boxIndex}` }
       ]
     ]
   };
