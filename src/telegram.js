@@ -585,6 +585,68 @@ export async function setWebhook(
   );
 }
 
+// ==========================================
+// Edit Message Media (برای ویرایش عکس و کپشن پیام موجود)
+// ==========================================
+
+export async function editMessageMedia(
+  token,
+  chatId,
+  messageId,
+  photoBlob,
+  caption = "",
+  replyMarkup = null
+) {
+
+  const formData = new FormData();
+  
+  const mediaObj = {
+    type: "photo",
+    media: "attach://sudoku",
+    parse_mode: "HTML"
+  };
+
+  if (caption) {
+    mediaObj.caption = caption;
+  }
+
+  formData.append("chat_id", String(chatId));
+  formData.append("message_id", String(messageId));
+  formData.append("media", JSON.stringify(mediaObj));
+  formData.append("sudoku", photoBlob, "sudoku.png");
+
+  if (replyMarkup) {
+    formData.append("reply_markup", JSON.stringify(replyMarkup));
+  }
+
+  const url = `https://api.telegram.org/bot${token}/editMessageMedia`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    body: formData
+  });
+
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(`Telegram returned invalid JSON. HTTP ${response.status}`);
+  }
+
+  if (!response.ok || !data.ok) {
+    const description = data?.description || `HTTP ${response.status}`;
+    
+    if (description.includes("Not Found") || description.includes("message to edit not found")) {
+      console.warn("editMessageMedia skipped: message not found or old.");
+      return null;
+    }
+
+    console.error("Telegram editMessageMedia error:", description);
+    throw new Error(`Telegram API error: ${description}`);
+  }
+
+  return data.result;
+}
 
 // ==========================================
 // Delete Webhook
