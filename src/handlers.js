@@ -62,7 +62,7 @@ export function createBoardText(game, highlightCell = -1) {
   const filledCount = board.filter(v => v !== 0).length;
   game.progress = Math.round((filledCount / 81) * 100);
 
-  gridStr += "</code>\n\n📊 <b>پیشرفت:</b> " + game.progress + "% | ⭐ <b>امتیاز:</b> " + (game.scores[game.turnUserId] || 0) + " | ❌ <b>خطاها:</b> " + (game.errors[game.turnUserId] || 0) + "/4";
+  gridStr += "</code>\n\n📊 <b>پیشرفت:</b> " + game.progress + "% | ⭐ <b>امتیاز فعلی:</b> " + (game.scores[game.turnUserId] || 0) + " | ❌ <b>خطاها:</b> " + (game.errors[game.turnUserId] || 0) + "/4";
   
   return gridStr;
 }
@@ -85,7 +85,7 @@ export async function handleUpdate(update, env) {
     if (msg.text === '/start') {
       await callTelegram(token, 'sendMessage', {
         chat_id: msg.chat.id,
-        text: '🧩 <b>سودوکو چندنفره آنلاین</b>\n\nهر بازیکن ۳ اجازه خطا دارد و با خطای چهارم بازنده می‌شود.\nهر عدد درست ۱+ امتیاز و هر خطا ۲- امتیاز منفی دارد.\n\nلطفاً درجه سختی بازی را انتخاب کنید:',
+        text: '🧩 <b>سودوکو چندنفره آنلاین</b>\n\nهر بازیکن ۴ اجازه خطا دارد. اگر ۴ خطا کنید، پس از ۱۰ دقیقه می‌توانید دوباره به بازی برگردید!\nهر عدد درست ۱+ امتیاز و هر خطا ۲- امتیاز دارد.\n\nلطفاً درجه سختی بازی را انتخاب کنید:',
         parse_mode: 'HTML',
         reply_markup: buildDifficultyKeyboard()
       });
@@ -149,6 +149,7 @@ export async function handleUpdate(update, env) {
         difficulty: difficulty,
         scores: {},
         errors: {},
+        banTimes: {},
         playerNames: {},
         usedPuzzles: new Set([newPuzzleObj.id])
       };
@@ -190,13 +191,28 @@ export async function handleUpdate(update, env) {
     }
     game.turnUserId = userId;
 
+    // بررسی محدودیت ۱۰ دقیقه برای بازگشت کاربر اخراج شده
     if (game.errors[userId] >= 4) {
-      await callTelegram(token, 'answerCallbackQuery', {
-        callback_query_id: query.id,
-        text: 'شما ۴ خطا داشته‌اید و از این بازی حذف شده‌اید!',
-        show_alert: true
-      });
-      return new Response('OK', { status: 200 });
+      const banTime = game.banTimes[userId] || 0;
+      const now = Date.now();
+      const tenMinutes = 10 * 60 * 1000;
+
+      if (now - banTime < tenMinutes) {
+        const remainingSeconds = Math.ceil((tenMinutes - (now - banTime)) / 1000);
+        const remainingMinutes = Math.floor(remainingSeconds / 60);
+        const secs = remainingSeconds % 60;
+
+        await callTelegram(token, 'answerCallbackQuery', {
+          callback_query_id: query.id,
+          text: `❌ شما به دلیل ۴ خطا اخراج شده‌اید!\nلطفاً ${remainingMinutes} دقیقه و ${secs} ثانیه دیگر صبر کنید.`,
+          show_alert: true
+        });
+        return new Response('OK', { status: 200 });
+      } else {
+        // زمان تمام شده، بخشش بازیکن و ریست کردن خطاهای او
+        game.errors[userId] = 0;
+        delete game.banTimes[userId];
+      }
     }
 
     const editPayload = {
@@ -256,22 +272,34 @@ export async function handleUpdate(update, env) {
       }
 
       if (game.errors[userId] >= 4) {
-        editPayload.text = createBoardText(game, -1) + `\n\n❌ <b>${userName}</b> ۴ خطای مجاز را پر کرد و باخت!`;
-        editPayload.reply_markup = buildFinishedKeyboard();
+        game.banTimes[userId] = Date.now(); // ثبت زمان محرومیت ۱۰ دقیقه‌ای
+        
+        await callTelegram(token, 'answerCallbackQuery', {
+          callback_query_id: query.id,
+          text: 'شما ۴ خطا کردید و از بازی اخراج شدید. ۱۰ دقیقه دیگر می‌توانید برگردید!',
+          show_alert: true
+        });
+
+        editPayload.text = createBoardText(game, -1) + `\n\n❌ <b>${userName}</b> ۴ خطای مجاز را پر کرد و موقتاً اخراج شد!`;
+        editPayload.reply_markup = buildBoxCellsKeyboard(game.board, boxIndex);
         await callTelegram(token, 'editMessageText', editPayload);
-        if (chatId) activeGames.delete(chatId);
-        else activeGames.delete(inlineMessageId);
         return new Response('OK', { status: 200 });
       }
 
       const isFinished = game.board.every((val, idx) => val === game.solution[idx]);
 
       if (isFinished) {
-        let scoresText = Object.entries(game.scores)
-          .map(([id, score]) => `👤 ${game.playerNames[id]}: ${score} امتیاز`)
+        // محاسبه بیشترین امتیاز و تعیین برنده مجموع
+        let sortedScores = Object.entries(game.scores).sort((a, b) => b[1] - a[1]);
+        
+        let scoresText = sortedScores
+          .map(([id, score], index) => {
+            const medal = index === 0 ? '👑 برنده:' : `👤`;
+            return `${medal} ${game.playerNames[id]}: ${score} امتیاز`;
+          })
           .join('\n');
 
-        editPayload.text = createBoardText(game, -1) + `\n\n🏆 تبریک! جدول کامل شد!\n\n${scoresText}`;
+        editPayload.text = createBoardText(game, -1) + `\n\n🏆 <b>بازی به پایان رسید و جدول کامل شد!</b>\n\n${scoresText}`;
         editPayload.reply_markup = buildFinishedKeyboard();
       } else {
         editPayload.text = createBoardText(game, -1) + `\n\n👇 <b>خانه دیگری انتخاب کنید:</b>`;
@@ -292,4 +320,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-      }
+                                            }
