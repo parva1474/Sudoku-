@@ -20,7 +20,7 @@ export function createBoardText(game, highlightCell = -1) {
   const filledCount = board.filter(v => v !== 0).length;
   game.progress = Math.round((filledCount / 81) * 100);
 
-  // جدول فشرده و کوچک داخل تگ code برای جلوگیری از به هم ریختگی در تلگرام دیگران
+  // جدول با فاصله استاندارد و خوانا داخل تگ code
   let gridStr = `🧩 <b>سودوکو چندنفره آنلاین</b>\n👤 بازیکن: ${game.playerNames[game.turnUserId] || 'بازیکن'}\n\n<code>`;
 
   for (let row = 0; row < 9; row++) {
@@ -32,7 +32,7 @@ export function createBoardText(game, highlightCell = -1) {
       if (idx === highlightCell) {
         gridStr += `[${display}]`;
       } else {
-        gridStr += `${display}`;
+        gridStr += ` ${display} `;
       }
       
       if ((col + 1) % 3 === 0 && col < 8) {
@@ -42,12 +42,12 @@ export function createBoardText(game, highlightCell = -1) {
     gridStr += "\n";
     
     if ((row + 1) % 3 === 0 && row < 8) {
-      gridStr += "-----------+\n";
+      gridStr += "-------------------------+\n";
     }
   }
   gridStr += `</code>`;
 
-  // آمار و امتیازات خارج از تگ code قرار می‌گیرند تا عرض جدول بزرگ نشود
+  // آمار و امتیازات خارج از تگ code برای جلوگیری از به هم ریختگی
   const counts = {};
   for (let i = 1; i <= 9; i++) {
     counts[i] = 9;
@@ -405,4 +405,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-                           }
+            }
