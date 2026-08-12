@@ -88,6 +88,47 @@ async function sendGameMessage(token, chatId, game) {
   const text = createBoardText(game);
   await sendMessage(token, chatId, text, buildSudokuGridKeyboard(game.board, game.selectedCell));
 }
+// ==========================================
+// ساخت جدول متنی ۹ در ۹ برای نمایش در متن پیام
+// ==========================================
+
+function createSudokuGridText(board, selectedCell = -1) {
+  let gridStr = "<b>🧩 جدول سودوکو:</b>\n\n<code>";
+  
+  for (let row = 0; row < 9; row++) {
+    // خط جداکننده افقی برای خوانایی بیشتر بلوک‌های 3 در 3
+    if (row > 0 && row % 3 === 0) {
+      gridStr += "---------------------\n";
+    }
+
+    let rowChars = [];
+    for (let col = 0; col < 9; col++) {
+      // خط جداکننده عمودی بین بلوک‌ها
+      if (col > 0 && col % 3 === 0) {
+        rowChars.push("|");
+      }
+
+      const index = (row * 9) + col;
+      const val = board[index];
+      
+      // اگر خانه خالی بود نقطه و اگر پر بود عدد خودش
+      let char = val ? String(val) : ".";
+      
+      // اگر این خانه توسط کاربر انتخاب شده باشد
+      if (index === selectedCell) {
+        char = `[${char}]`;
+      } else {
+        char = ` ${char} `;
+      }
+
+      rowChars.push(char);
+    }
+    gridStr += rowChars.join("") + "\n";
+  }
+  
+  gridStr += "</code>";
+  return gridStr;
+}
 
 async function editGameMessage(token, message, game) {
   const text = createBoardText(game);
