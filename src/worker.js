@@ -1,7 +1,7 @@
 // ==========================================
 // src/worker.js
 // Telegram Sudoku Bot
-// Cloudflare Workers + D1
+// Cloudflare Workers + KV
 // ==========================================
 
 import { handleUpdate } from "./handlers.js";
@@ -41,7 +41,7 @@ export default {
       }
 
       // هدایت آپدیت‌ها به فایل handlers.js
-      await handleUpdate(update, env, token);
+      await handleUpdate(update, env);
 
       return new Response(
         "OK",
