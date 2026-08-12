@@ -9,8 +9,6 @@ import { generateSudoku } from './sudokuGenerator.js';
 
 const activeGames = new Map();
 
-const BOX_COLORS = ["🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "🟫", "⬛", "⬜"];
-
 const BOX_COLORS_BG = [
   "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨",
   "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨",
@@ -37,11 +35,11 @@ export function createBoardText(game, highlightCell = -1) {
       const colorIcon = BOX_COLORS_BG[idx];
       
       if (idx === highlightCell) {
-        gridStr += `[${val ? val : '·'}]`;
+        gridStr += `[${val ? val + ' ' : '· '}]`;
       } else if (val !== 0) {
         gridStr += ` ${val} `;
       } else {
-        gridStr += colorIcon + " ";
+        gridStr += colorIcon;
       }
       
       if ((col + 1) % 3 === 0 && col < 8) {
@@ -53,7 +51,7 @@ export function createBoardText(game, highlightCell = -1) {
     gridStr += "\n";
     
     if ((row + 1) % 3 === 0 && row < 8) {
-      gridStr += "---------------------------------\n";
+      gridStr += "-----------------------|\n";
     }
   }
   
@@ -107,7 +105,6 @@ export async function handleUpdate(update, env) {
     if (data.startsWith('difficulty:') || data === 'action:new') {
       const difficulty = data.startsWith('difficulty:') ? data.split(':')[1] : (game?.difficulty || 'easy');
       
-      // تولید جدول تصادفی جدید (بدون تکرار از میان ۱۰۰۰ پازل)
       const newPuzzleObj = generateSudoku(difficulty);
       
       game = {
@@ -143,7 +140,6 @@ export async function handleUpdate(update, env) {
       return new Response('OK', { status: 200 });
     }
 
-    // ثبت‌نام یا چرخش نوبت بازیکنان
     if (!game.playerNames[userId]) {
       game.playerNames[userId] = userName;
     }
@@ -204,9 +200,9 @@ export async function handleUpdate(update, env) {
       } else {
         if (game.solution[cellIndex] === num) {
           game.board[cellIndex] = num;
-          game.scores[userId] += 1; // ۱ امتیاز مثبت
+          game.scores[userId] += 1;
         } else {
-          game.errors[userId] += 1; // ۲ امتیاز منفی
+          game.errors[userId] += 1;
           game.scores[userId] = Math.max(0, game.scores[userId] - 2);
         }
       }
@@ -241,7 +237,7 @@ export async function handleUpdate(update, env) {
         await callTelegram(token, 'editMessageText', {
           chat_id: chatId,
           message_id: messageId,
-        text: createBoardText(game, -1) + `\n\n👇 <b>خانه دیگری انتخاب کنید:</b>`,
+          text: createBoardText(game, -1) + `\n\n👇 <b>خانه دیگری انتخاب کنید:</b>`,
           parse_mode: 'HTML',
           reply_markup: buildBoxCellsKeyboard(game.board, boxIndex)
         });
@@ -262,4 +258,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-}
+  }
