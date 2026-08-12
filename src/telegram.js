@@ -227,7 +227,7 @@ export async function sendPhoto(
   return data.result;
 }
 
-
+  
 // ==========================================
 // Edit Message Photo
 // ==========================================
@@ -339,6 +339,13 @@ export async function editMessagePhoto(
     const description =
       data?.description ||
       `HTTP ${response.status}`;
+
+
+    // اگر پیام پیدا نشد یا قدیمی بود، به جای کرش کردن، لاگ هشدار بده و رد شو
+    if (description.includes("Not Found") || description.includes("message to edit not found")) {
+      console.warn("editMessagePhoto skipped: message not found or old.");
+      return null;
+    }
 
 
     console.error(
