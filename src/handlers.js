@@ -13,20 +13,6 @@ import { generateSudoku } from './sudokuGenerator.js';
 
 const activeGames = new Map();
 
-const BOX_COLORS_BG = [
-  "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨",
-  "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨",
-  "🟥", "🟥", "🟥",  "🟧", "🟧", "🟧",  "🟨", "🟨", "🟨",
-
-  "🟩", "🟩", "🟩",  "🟦", "🟦", "🟦",  "🟪", "🟪", "🟪",
-  "🟩", "🟩", "🟩",  "🟦", "🟦", "🟦",  "🟪", "🟪", "🟪",
-  "🟩", "🟩", "🟩",  "🟦", "🟦", "🟦",  "🟪", "🟪", "🟪",
-
-  "🟫", "🟫", "🟫",  "⬛", "⬛", "⬛",  "⬜", "⬜", "⬜",
-  "🟫", "🟫", "🟫",  "⬛", "⬛", "⬛",  "⬜", "⬜", "⬜",
-  "🟫", "🟫", "🟫",  "⬛", "⬛", "⬛",  "⬜", "⬜", "⬜"
-];
-
 export function createBoardText(game, highlightCell = -1) {
   let gridStr = `🧩 <b>سودوکو چندنفره آنلاین</b>\n👤 بازیکن: ${game.playerNames[game.turnUserId] || 'بازیکن'}\n\n<code>`;
   
@@ -36,14 +22,13 @@ export function createBoardText(game, highlightCell = -1) {
     for (let col = 0; col < 9; col++) {
       const idx = row * 9 + col;
       const val = board[idx];
-      const colorIcon = BOX_COLORS_BG[idx];
       
       if (idx === highlightCell) {
-        gridStr += `[${val ? val + ' ' : '· '}]`;
+        gridStr += `[${val !== 0 ? val : '·'}]`;
       } else if (val !== 0) {
         gridStr += ` ${val} `;
       } else {
-        gridStr += colorIcon;
+        gridStr += ` ⚪ `;
       }
       
       if ((col + 1) % 3 === 0 && col < 8) {
@@ -55,7 +40,7 @@ export function createBoardText(game, highlightCell = -1) {
     gridStr += "\n";
     
     if ((row + 1) % 3 === 0 && row < 8) {
-      gridStr += "-----------------------|\n";
+      gridStr += "-------+-------+-------\n";
     }
   }
   
@@ -317,4 +302,4 @@ export async function handleUpdate(update, env) {
   }
 
   return new Response('OK', { status: 200 });
-        }
+}
