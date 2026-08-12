@@ -1,6 +1,6 @@
 {
   "name": "sudoku",
-  "main": "src/index.js",
+  "main": "src/worker.js",
   "compatibility_date": "2026-08-13",
   "kv_namespaces": [
     {
