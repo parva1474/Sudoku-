@@ -61,26 +61,6 @@ const VALID_DIFFICULTIES = [
 // پردازش Update
 // ==========================================
 
-async function handleCallbackQuery(
-  callback,
-  env,
-  token
-) {
-
-  const callbackId =
-    callback.id;
-
-  const message =
-    callback.message;
-
-  // 👇 همینجا در ابتدای تابع، این خط را اضافه کنید تا بلافاصله به تلگرام پاسخ داده شود
-  await answerCallbackQuery(token, callbackId).catch(() => {});
-
-  if (!message) {
-    return;
-  }
-  // ... ادامه کدها
-  
 export async function handleUpdate(
   update,
   env,
@@ -518,6 +498,7 @@ async function editGameMessage(
   );
 }
 
+
 // ==========================================
 // Callback Handler
 // ==========================================
@@ -534,14 +515,10 @@ async function handleCallbackQuery(
   const message =
     callback.message;
 
+  // پاسخ سریع به تلگرام برای جلوگیری از خطای Timeout
+  await answerCallbackQuery(token, callbackId).catch(() => {});
 
   if (!message) {
-
-    await answerCallbackQuery(
-      token,
-      callbackId
-    );
-
     return;
   }
 
@@ -582,13 +559,6 @@ async function handleCallbackQuery(
         difficulty
       )
     ) {
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "درجه سختی نامعتبر است."
-      );
-
       return;
     }
 
@@ -609,13 +579,6 @@ async function handleCallbackQuery(
         "Sudoku generation error:",
         error
       );
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "❌ خطا در ساخت جدول."
-      );
-
       return;
     }
 
@@ -642,13 +605,6 @@ async function handleCallbackQuery(
       game
     );
 
-
-    await answerCallbackQuery(
-      token,
-      callbackId,
-      "🎮 بازی شروع شد."
-    );
-
     return;
   }
 
@@ -665,13 +621,6 @@ async function handleCallbackQuery(
 
 
   if (!game) {
-
-    await answerCallbackQuery(
-      token,
-      callbackId,
-      "بازی فعالی پیدا نشد."
-    );
-
     return;
   }
 
@@ -697,13 +646,6 @@ async function handleCallbackQuery(
       block < 0 ||
       block > 8
     ) {
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "بلوک نامعتبر است."
-      );
-
       return;
     }
 
@@ -721,12 +663,6 @@ async function handleCallbackQuery(
         block,
         game
       )
-    );
-
-
-    await answerCallbackQuery(
-      token,
-      callbackId
     );
 
     return;
@@ -756,12 +692,6 @@ async function handleCallbackQuery(
       pngBlob,
       createBoardCaption(game),
       buildBlockKeyboard(game)
-    );
-
-
-    await answerCallbackQuery(
-      token,
-      callbackId
     );
 
     return;
@@ -823,12 +753,6 @@ async function handleCallbackQuery(
       );
     }
 
-
-    await answerCallbackQuery(
-      token,
-      callbackId
-    );
-
     return;
   }
 
@@ -854,13 +778,6 @@ async function handleCallbackQuery(
       index < 0 ||
       index >= 81
     ) {
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "خانه نامعتبر است."
-      );
-
       return;
     }
 
@@ -896,27 +813,6 @@ async function handleCallbackQuery(
       buildNumberKeyboard(game)
     );
 
-
-    if (
-      game.puzzle[index] !== null &&
-      game.puzzle[index] !== undefined
-    ) {
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "🔒 این خانه ثابت است."
-      );
-
-    } else {
-
-      await answerCallbackQuery(
-        token,
-        callbackId
-      );
-    }
-
-
     return;
   }
 
@@ -948,15 +844,6 @@ async function handleCallbackQuery(
       game
     );
 
-
-    await answerCallbackQuery(
-      token,
-      callbackId,
-      game.pencilMode
-        ? "✏️ مداد روشن شد."
-        : "✏️ مداد خاموش شد."
-    );
-
     return;
   }
 
@@ -972,22 +859,14 @@ async function handleCallbackQuery(
     if (
       game.selectedCell === -1
     ) {
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "اول یک خانه انتخاب کن."
-      );
-
       return;
     }
 
 
-    const result =
-      eraseNumber(
-        game,
-        game.selectedCell
-      );
+    eraseNumber(
+      game,
+      game.selectedCell
+    );
 
 
     await saveGame(
@@ -1002,15 +881,6 @@ async function handleCallbackQuery(
       token,
       message,
       game
-    );
-
-
-    await answerCallbackQuery(
-      token,
-      callbackId,
-      result.ok
-        ? "🧹 پاک شد."
-        : result.message
     );
 
     return;
@@ -1030,13 +900,6 @@ async function handleCallbackQuery(
     if (
       game.selectedCell === -1
     ) {
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "اول یک خانه انتخاب کن."
-      );
-
       return;
     }
 
@@ -1052,13 +915,6 @@ async function handleCallbackQuery(
       number < 1 ||
       number > 9
     ) {
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "عدد نامعتبر است."
-      );
-
       return;
     }
 
@@ -1067,19 +923,14 @@ async function handleCallbackQuery(
       game.selectedCell;
 
 
-    // --------------------------------------
-    // Pencil
-    // --------------------------------------
-
     if (
       game.pencilMode
     ) {
 
-      const result =
-        toggleNote(
-          game,
-          number
-        );
+      toggleNote(
+        game,
+        number
+      );
 
 
       await saveGame(
@@ -1096,26 +947,9 @@ async function handleCallbackQuery(
         game
       );
 
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        result.ok
-          ? (
-              result.added
-                ? `✏️ ${number} اضافه شد.`
-                : `✏️ ${number} حذف شد.`
-            )
-          : result.message
-      );
-
       return;
     }
 
-
-    // --------------------------------------
-    // عدد اصلی
-    // --------------------------------------
 
     const result =
       putNumber(
@@ -1133,10 +967,6 @@ async function handleCallbackQuery(
     );
 
 
-    // --------------------------------------
-    // برنده
-    // --------------------------------------
-
     if (
       result.won
     ) {
@@ -1147,19 +977,9 @@ async function handleCallbackQuery(
         game
       );
 
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "🎉 تبریک! Sudoku حل شد."
-      );
-
       return;
     }
 
-        // --------------------------------------
-    // اشتباه
-    // --------------------------------------
 
     if (
       result.mistake
@@ -1171,32 +991,14 @@ async function handleCallbackQuery(
         game
       );
 
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        `❌ اشتباه! خطا: ${game.mistakes}`
-      );
-
       return;
     }
 
-
-    // --------------------------------------
-    // درست
-    // --------------------------------------
 
     await editGameMessage(
       token,
       message,
       game
-    );
-
-
-    await answerCallbackQuery(
-      token,
-      callbackId,
-      "✅ درست!"
     );
 
     return;
@@ -1235,13 +1037,6 @@ async function handleCallbackQuery(
     if (
       !hintResult
     ) {
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "💡 راهنمایی در دسترس نیست."
-      );
-
       return;
     }
 
@@ -1263,38 +1058,10 @@ async function handleCallbackQuery(
     );
 
 
-    if (
-      result.won
-    ) {
-
-      await editGameMessage(
-        token,
-        message,
-        game
-      );
-
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "🎉 راهنمایی باعث تکمیل جدول شد."
-      );
-
-      return;
-    }
-
-
     await editGameMessage(
       token,
       message,
       game
-    );
-
-
-    await answerCallbackQuery(
-      token,
-      callbackId,
-      result.message
     );
 
     return;
@@ -1325,13 +1092,6 @@ async function handleCallbackQuery(
         "New game generation error:",
         error
       );
-
-      await answerCallbackQuery(
-        token,
-        callbackId,
-        "❌ ساخت بازی جدید ناموفق بود."
-      );
-
       return;
     }
 
@@ -1358,26 +1118,10 @@ async function handleCallbackQuery(
       freshGame
     );
 
-
-    await answerCallbackQuery(
-      token,
-      callbackId,
-      "🔄 بازی جدید ساخته شد."
-    );
-
     return;
   }
-
-
-  // ========================================
-  // Unknown Callback
-  // ========================================
-
-  await answerCallbackQuery(
-    token,
-    callbackId
-  );
 }
+
 
 // ==========================================
 // ویرایش صفحه انتخاب عدد
@@ -1784,12 +1528,4 @@ function safeJSON(
     }
 
 
-    return JSON.parse(
-      value
-    );
-
-  } catch {
-
-    return fallback;
-  }
-  }
+  
